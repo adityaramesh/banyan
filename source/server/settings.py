@@ -143,7 +143,7 @@ jobs = {
 			}
 		},
 
-		## This information is provided by the client.
+		# This information is provided by the worker.
 		'status': {
 			'type': 'string',
 			'allowed': [
@@ -176,7 +176,7 @@ jobs = {
 		'execution': {
 			'type': 'dict',
 			'schema': {
-				'server': {
+				'worker': {
 					'type': 'string',
 					'maxlength': max_name_length
 				},

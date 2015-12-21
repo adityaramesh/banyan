@@ -6,8 +6,6 @@ claims tasks from the queue based on available resources.
 
 # Agenda
 
-- Test the schema.
-- Test the server program on duncan using a Python script that issues requests.
 - Test the server program from another node.
 - Test the server program from liz.
 - Write code to handle things like cancellation correctly.
