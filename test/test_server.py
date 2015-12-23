@@ -4,17 +4,21 @@
 Tests the server.
 """
 
-from pymongo import Connection
+import socket
 import requests
 import json
+from pymongo import Connection
 from urllib.parse import urljoin
 
 # Drop the banyan database so that the test is idempotent.
 def drop_database():
 	Connection().drop_database('banyan')
 
+def get_ip():
+	return socket.gethostbyname(socket.gethostname())
+
 def post(resource, data):
-	entry_point = 'http://127.0.0.1:5000'
+	entry_point = 'http://' + get_ip() + ':5000'
 	url = urljoin(entry_point, resource) if resource else entry_point
 	headers = {'Content-Type': 'application/json'}
 
