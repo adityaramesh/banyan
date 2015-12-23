@@ -60,6 +60,7 @@ groups = {
 		'name': {
 			'type': 'string',
 			'maxlength': max_name_length,
+			'empty': False,
 			'required': True,
 			'unique': True
 		},
@@ -76,13 +77,15 @@ groups = {
 			'type': 'list',
 			'maxlength': max_job_list_length,
 			'default': [],
-			'schema': job_or_group
+			'schema': job_or_group,
+			'readonly': True
 		},
 		'pending_members': {
 			'type': 'list',
 			'maxlength': max_job_list_length,
 			'default': [],
-			'schema': job_or_group
+			'schema': job_or_group,
+			'readonly': True
 		}
 	}
 }
@@ -102,6 +105,7 @@ jobs = {
 		'command': {
 			'type': 'string',
 			'maxlength': 32768,
+			'empty': False,
 			'required': True
 		},
 		'state': {
@@ -233,7 +237,26 @@ jobs = {
 		'pending_dependency_count': {
 			'type': 'integer',
 			'min': 0,
-			'default': 0
+			'default': 0,
+			'readonly': True
+		},
+		# The identity of the failed or cancelled dependency that
+		# invalidated this job.
+		'invalidator': {
+			'type': 'dict',
+			'dependencies': {'state': 'cancelled'},
+			'schema': {
+				'resource': {
+					'type': 'string',
+					'allowed': ['job', 'group'],
+					'required': True
+				},
+				'id': {
+					'type': 'objectid',
+					'required': True
+				}
+			},
+			'readonly': True
 		},
 
 		#
@@ -256,24 +279,6 @@ jobs = {
 			'type': 'datetime',
 			'dependencies': {'state': ['running', 'terminated', 'cancelled']},
 		},
-		# The identity of the failed or cancelled dependency that
-		# invalidated this job.
-		'invalidator': {
-			'type': 'dict',
-			'dependencies': {'state': 'cancelled'},
-			'schema': {
-				'resource': {
-					'type': 'string',
-					'allowed': ['job', 'group'],
-					'required': True
-				},
-				'id': {
-					'type': 'objectid',
-					'required': True
-				}
-			}
-		},
-
 		# Contains execution metrics about the process.
 		'metrics': {
 			'type': 'dict',
