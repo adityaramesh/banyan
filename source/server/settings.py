@@ -13,6 +13,7 @@ MONGO_PORT   = os.environ.get('MONGO_PORT', 27017)
 MONGO_DBNAME = os.environ.get('MONGO_DBNAME', 'banyan')
 
 # Disable concurrency control (using etags).
+IF_MATCH         = False
 HATEOAS          = False
 RESOURCE_METHODS = ['GET', 'POST', 'DELETE']
 ITEM_METHODS     = ['GET', 'PATCH', 'DELETE']
