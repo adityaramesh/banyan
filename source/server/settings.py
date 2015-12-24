@@ -13,7 +13,6 @@ MONGO_PORT   = os.environ.get('MONGO_PORT', 27017)
 MONGO_DBNAME = os.environ.get('MONGO_DBNAME', 'banyan')
 
 # Disable concurrency control (using etags).
-IF_MATCH         = False
 HATEOAS          = False
 RESOURCE_METHODS = ['GET', 'POST', 'DELETE']
 ITEM_METHODS     = ['GET', 'PATCH', 'DELETE']
@@ -36,7 +35,7 @@ max_time_string_length = 32
 job_or_group = {
 	'type': 'dict',
 	'schema': {
-		'resource': {
+		'entity': {
 			'type': 'string',
 			'allowed': ['job', 'group'],
 			'required': True
@@ -57,7 +56,9 @@ groups = {
 	},
 
 	'schema': {
+		#
 		# Set by the user.
+		#
 
 		'name': {
 			'type': 'string',
@@ -71,24 +72,14 @@ groups = {
 			'maxlength': max_job_list_length,
 			'default': [],
 			'schema': job_or_group
-		},
-
-		# Maintained by the server.
-
-		'members': {
-			'type': 'list',
-			'maxlength': max_job_list_length,
-			'default': [],
-			'schema': job_or_group,
-			'readonly': True
-		},
-		'pending_members': {
-			'type': 'list',
-			'maxlength': max_job_list_length,
-			'default': [],
-			'schema': job_or_group,
-			'readonly': True
 		}
+
+		# We don't need to store the members here explicitly, since we
+		# can obtain them efficiently from MongoDB provided that there
+		# is an index on `members` for `jobs`. Rather than creating
+		# virtual subresources for convenient access to the set of
+		# members, we allow the client to use a GET query on the `jobs`
+		# resource with the filter on the ID of this group.
 	}
 }
 
@@ -224,18 +215,15 @@ jobs = {
 		# This information is managed by the server.
 		#
 
-		# In order to create a job with dependencies, the following
-		# steps must be followed in the given order (to avoid race
-		# conditions):
-		# - Create the child job (in the default `inactive` states).
-		# - Create the parent jobs (in the default `inactive` states),
-		# using the ID of the child job to specify the dependency.
-		# - Set the states of the the parent jobs to `available`.
-		#
-		# In the case where there is only one parent job, the parent
-		# job can be created in the `available` state directly. Note
-		# that it is the responsibility of each parent to increment
-		# this counter.
+		'retry_count': {
+			'type': 'integer',
+			'min': 0,
+			'default': 0,
+			'readonly': True
+		},
+		# If the count is greater than zero, then the state of the job
+		# should be `inactive`. Once the count reaches zero, the state
+		# of the job should be changed to `available`.
 		'pending_dependency_count': {
 			'type': 'integer',
 			'min': 0,
@@ -248,14 +236,14 @@ jobs = {
 			'type': 'dict',
 			'dependencies': {'state': 'cancelled'},
 			'schema': {
-				'resource': {
+				'entity': {
 					'type': 'string',
-					'allowed': ['job', 'group'],
+					'allowed': ['user', 'job', 'group'],
 					'required': True
 				},
 				'id': {
 					'type': 'objectid',
-					'required': True
+					'dependencies': {'entity': ['job', 'group']}
 				}
 			},
 			'readonly': True
