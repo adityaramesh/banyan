@@ -12,6 +12,8 @@ MONGO_HOST   = os.environ.get('MONGO_HOST', 'localhost')
 MONGO_PORT   = os.environ.get('MONGO_PORT', 27017)
 MONGO_DBNAME = os.environ.get('MONGO_DBNAME', 'banyan')
 
+# Disable concurrency control (using etags).
+IF_MATCH         = False
 HATEOAS          = False
 RESOURCE_METHODS = ['GET', 'POST', 'DELETE']
 ITEM_METHODS     = ['GET', 'PATCH', 'DELETE']
@@ -64,7 +66,7 @@ groups = {
 			'required': True,
 			'unique': True
 		},
-		'dependents': {
+		'continuations': {
 			'type': 'list',
 			'maxlength': max_job_list_length,
 			'default': [],
@@ -153,7 +155,7 @@ jobs = {
 				'data_relation': {'resource': 'groups'}
 			}
 		},
-		'dependents': {
+		'continuations': {
 			'type': 'list',
 			'maxlength': max_job_list_length,
 			'default': [],
