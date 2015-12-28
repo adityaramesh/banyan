@@ -99,7 +99,7 @@ execution_info = {
 						'type': 'datetime',
 						'required': True
 					},
-					'usage_bytes': {
+					'resident_memory_bytes': {
 						'type': 'integer',
 						'min': 0,
 						'required': True
@@ -144,7 +144,7 @@ execution_info = {
 						'min': 0,
 						'required': True
 					},
-					'usage_bytes': {
+					'resident_memory_bytes': {
 						'type': 'integer',
 						'min': 0,
 						'required': True
@@ -211,7 +211,7 @@ tasks = {
 				"""
 				The server puts a task in this state when it is
 				cancelled while in the `running` state. The
-				status will be changed to `cancelled` or
+				state will be changed to `cancelled` or
 				`terminated` once the worker delivers an update.
 				"""
 				'pending_cancellation',
@@ -219,7 +219,8 @@ tasks = {
 				"""
 				Either cancelled directly by the user or
 				invalidated as a result of one of the parent
-				tasks being cancelled or terminating unsuccessfully.
+				tasks being cancelled or terminating
+				unsuccessfully.
 				"""
 				'cancelled',
 
@@ -244,28 +245,27 @@ tasks = {
 		"""
 		This field is not required, and we don't enforce that the task
 		terminates within the amount of time given below. Its purpose
-		is to allow the user to compute cumulative time estimates.
+		is to allow the user to compute time estimates for task chains.
 		"""
 		'estimated_runtime': {
 			'type': 'string',
 			'regex': time_regex,
-			'maxlength': max_time_string_length
+			'maxlength': max_time_string_length,
+
+			"""
+			If this task is being used as a task group (i.e. it has
+			one or more continuations but no command), then it
+			makes no sense for the user to provide a value for this
+			field.
+			"""
+			'dependencies': ['command']
 		},
 
 		'requested_resources': {
 			'type': 'dict',
 			'required': True,
+			'dependencies': ['command'],
 			'schema': resource_info
-		},
-
-		"""
-		The number of times we will put a task back on the queue if we
-		find that it terminates unsuccessfully.
-		"""
-		'max_retry_count': {
-			'type': 'integer',
-			'min': 0,
-			'default': 0
 		},
 
 		"""
@@ -276,6 +276,7 @@ tasks = {
 			'type': 'string',
 			'regex': time_regex,
 			'maxlength': max_time_string_length,
+			'dependencies': ['command'],
 
 			"""
 			We are generous with the default cancellation time, in
@@ -283,7 +284,18 @@ tasks = {
 			to a slow disk.
 			"""
 			'default': '10 minutes'
-		}
+		},
+
+		"""
+		The number of times we will put a task back on the queue if we
+		find that it terminates unsuccessfully.
+		"""
+		'max_retry_count': {
+			'type': 'integer',
+			'min': 0,
+			'default': 0,
+			'dependencies': ['command']
+		},
 
 		"""
 		Information managed by the server.
