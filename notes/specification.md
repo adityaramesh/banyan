@@ -21,6 +21,10 @@ when various prerequisites are fulfilled.
   - `tasks/add_continuation`
   - `tasks/remove_continuation`
 
+- TODO: virtual resources for computing statistics.
+  - Global virtual resources for global statistics.
+  - Subresources of `tasks` for finer scope.
+
 - For use by workers:
   - `execution_info/worker`
   - `execution_info/exit_status`
@@ -147,7 +151,7 @@ when various prerequisites are fulfilled.
 
 - TODO: implement the rest of the events first.
 
-## Job State Changes
+## Task State Changes
 
 - No concurrency control is required for any of the state changes below. Rather
   than enforcing that the client has up-to-date information for each request,
