@@ -84,7 +84,7 @@ execution_info = {
 	'schema': {
 		'worker': {
 			'type': 'string',
-			'maxlength': max_name_length
+			'maxlength': max_name_string_length
 		},
 		'exit_status': {'type': 'integer'},
 		'time_started': {'type': 'datetime'},
