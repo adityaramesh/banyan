@@ -11,9 +11,9 @@ claims tasks from the queue based on available resources.
 - Server-side code.
   - Implement task creation.
   - Test.
-  - Implement work-stealing (without worker).
+  - Implement work-stealing (server side).
   - Test.
-  - Implement cancellation (without worker).
+  - Implement cancellation (server side).
   - Test.
   - Implement task state changes.
   - Test.
@@ -21,21 +21,19 @@ claims tasks from the queue based on available resources.
 - Worker-side code.
   - Implement basic prototype to run jobs without the server.
   - Test.
+  - Implement work-stealing (worker side).
+  - Test.
   - Implement task termination.
   - Test.
-  - Implement work-stealing.
+  - Implement cancellation (worker side).
   - Test.
-  - Implement cancellation.
-  - Test.
-
-- Write the client program.
-- Finish cancellation.
-- Add support for the client sending progress reports.
-- Test.
 
 - At this point, the job submission system works, but:
   - We have to use curl. Consider writing a more convenient submission script
     in Python.
+
+- Add support for the client sending progress reports.
+- Test.
 
 - Implement the virtual resources on the server side to compute statistics.
 
