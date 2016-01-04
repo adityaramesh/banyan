@@ -32,7 +32,7 @@ class TaskValidator(Validator):
 		return super().validate(document, schema, update, context)
 
 	def validate_new_task(self, document):
-		if document['state'] not in ['inactive', 'available']:
+		if 'state' in document and document['state'] not in ['inactive', 'available']:
 			self._error("Tasks can only be created in the " \
 				"'inactive' and 'available' states.")
 			return False

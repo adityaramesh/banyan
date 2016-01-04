@@ -31,6 +31,8 @@ def post(resource, data):
 
 class TestTaskCreation(unittest.TestCase):
 	def test_creation_without_continuations(self):
+		drop_database()
+
 		tasks = [
 			(
 				{'name': 'test 1'},
@@ -82,7 +84,6 @@ class TestTaskCreation(unittest.TestCase):
 			)
 		]
 
-		print("Testing job creation.")
 		for doc, code in tasks:
 			response = post('tasks', doc)
 			message = "Input: {}. Response: {}.".format(doc, response.json())
@@ -91,12 +92,13 @@ class TestTaskCreation(unittest.TestCase):
 	# TODO: things like adding an active task as a continuation to another
 	# should fail.
 	def test_creation_with_continuations(self):
+		#drop_database()
 		pass
 
 	# TODO: test changes to info of inactive tasks.
-	def test_mutation(self):
+	def test_updates(self):
+		#drop_database()
 		pass
 
 if __name__ == '__main__':
-	drop_database()
 	unittest.main()
