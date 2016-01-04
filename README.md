@@ -10,6 +10,22 @@ claims tasks from the queue based on available resources.
 
 - Server-side code.
   - Implement task creation.
+    - Things to check during insertion-time using event hooks:
+      - If command is provided, then requested resources must be as well.
+      - Ensure that the state is either `inactive` or `available`. If the task
+        is a continuation, ensure that the state is `inactive`.
+      - The user should only be able to explicitly make the following state
+        transitions:
+        - inactive to available
+	- anything to cancelled
+      - Fields that can't be changed if the task is not inactive:
+        - command
+	- name
+	- continuations
+        - estimated runtime
+	- requested resources (but ok to change if task is inactive)
+	- max termination time
+	- max retry count
   - Test.
   - Implement work-stealing (server side).
   - Test.
