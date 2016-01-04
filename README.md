@@ -11,9 +11,6 @@ claims tasks from the queue based on available resources.
 - Server-side code.
   - Implement task creation.
     - Things to check during insertion-time using event hooks:
-      - If command is provided, then requested resources must be as well.
-      - Ensure that the state is either `inactive` or `available`. If the task
-        is a continuation, ensure that the state is `inactive`.
       - The user should only be able to explicitly make the following state
         transitions:
         - inactive to available

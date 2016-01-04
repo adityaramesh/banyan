@@ -53,8 +53,7 @@ when various prerequisites are fulfilled.
   - Set the state to `terminated`.
 
 - When a task is created:
-  - Check that the state is either `inactive` or `available`. If the task is a
-    continuation, the state must be `inactive`.
+  - Check that the state is either `inactive` or `available`.
   - For each continuation `c`, call `acquire_continuation(c)`.
   - If the task has no provided command and is created in the `available`
     state, then call `release_continuations(self)`.

@@ -6,7 +6,7 @@ Configuration settings for the server.
 
 import os
 
-DEBUG = True
+#DEBUG = True
 
 """
 We assume that MongoDB is set up with no access control, so we don't need to
