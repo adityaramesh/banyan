@@ -7,6 +7,8 @@ Tests the server.
 import socket
 import requests
 import json
+import unittest
+
 from pymongo import Connection
 from urllib.parse import urljoin
 
@@ -27,65 +29,74 @@ def post(resource, data):
 	# the URL. As a result, nested JSON will not get encoded correctly.
 	return requests.post(url, headers=headers, data=json.dumps(data))
 
-def test_group_creation():
-	groups = [
-		{'name': 'group_1'},
-		{},
-		{'name': 'group_3', 'foo': 'bar'}
-	]
+class TestTaskCreation(unittest.TestCase):
+	def test_creation_without_continuations(self):
+		tasks = [
+			(
+				{'name': 'test 1'},
+				requests.codes.created
+			),
+			(
+				{'command': 'test'},
+				requests.codes.unprocessable_entity
+			),
+			(
+				{'name': 'test 3', 'command': 'test'},
+				requests.codes.unprocessable_entity
+			),
+			(
+				{
+					'name': 'test 4',
+					'command': 'test',
+					'requested_resources': {
+						'memory': '64 GiB'
+					}
+				},
+				requests.codes.created
+			),
+			(
+				{
+					'name': 'test 5',
+					'command': 'test',
+					'requested_resources': {
+						'memory': '64 GiB',
+						'cores': 8
+					}
+				},
+				requests.codes.created
+			),
+			(
+				{
+					'name': 'test 6',
+					'command': 'test',
+					'requested_resources': {
+						'memory': '64 GiB',
+						'cores': 8,
+						'gpus': [{
+							'memory': '8 GiB',
+							'min_compute_capability': '5.0'
+						}]
+					}
+				},
+				requests.codes.created
+			)
+		]
 
-	codes = [
-		requests.codes.created,
-		requests.codes.unprocessable_entity,
-		requests.codes.unprocessable_entity
-	]
+		print("Testing job creation.")
+		for doc, code in tasks:
+			response = post('tasks', doc)
+			message = "Input: {}. Response: {}.".format(doc, response.json())
+			self.assertEqual(response.status_code, code, msg=message)
 
-	print("Testing group creation.")
-	for doc, code in zip(groups, codes):
-		assert post('groups', doc).status_code == code
+	# TODO: things like adding an active task as a continuation to another
+	# should fail.
+	def test_creation_with_continuations(self):
+		pass
 
-def test_job_creation():
-	jobs = [
-		{
-			'command': 'ls',
-			'requested_resources': {
-				'memory': '64 GiB'
-			}
-		},
-		{
-			'command': 'ls',
-			'requested_resources': {
-				'memory': '64 GiB',
-				'cores': 8
-			}
-		},
-		{
-			'command': 'ls',
-			'requested_resources': {
-				'memory': '64 GiB',
-				'cores': 8,
-				'gpus': [{
-					'memory': '8 GiB',
-					'min_compute_capability': '5.0'
-				}]
-			}
-		}
-	]
-
-	codes = [
-		requests.codes.created,
-		requests.codes.created,
-		requests.codes.created
-	]
-
-	print("Testing job creation.")
-	for doc, code in zip(jobs, codes):
-		assert post('jobs', doc).status_code == code
-
-def test_schema():
-	test_group_creation()
-	test_job_creation()
+	# TODO: test changes to info of inactive tasks.
+	def test_mutation(self):
+		pass
 
 if __name__ == '__main__':
 	drop_database()
-	test_schema()
+	unittest.main()
