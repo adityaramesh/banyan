@@ -6,6 +6,8 @@ Configuration settings for the server.
 
 import os
 
+DEBUG = True
+
 """
 We assume that MongoDB is set up with no access control, so we don't need to
 use any credentials.
@@ -34,6 +36,13 @@ max_memory_string_length = 32
 
 time_regex = r'[1-9][0-9]*(.[0-9]*)? (second|minute|hour)s?'
 max_time_string_length = 32
+
+"""
+☠ ☠ ☠
+XXX: Don't use multiline strings to write comments inside of dicts, because the
+strings will be prepended to the keys!
+☠ ☠ ☠
+"""
 
 """
 Used by the user to indicate the resources that are expected to be consumed by
@@ -165,9 +174,7 @@ tasks = {
 	'item_title': 'task',
 
 	'schema': {
-		"""
-		Information provided by the client.
-		"""
+		# Information provided by the client.
 
 		'command': {
 			'type': 'string',
@@ -182,52 +189,39 @@ tasks = {
 			'unique': True
 		},
 
-		"""
-		If a task has no parents, the user can optionally create it in
-		the `available` state directly.
-		"""
+		# If a task has no parents, the user can optionally create it
+		# in the `available` state directly.
 		'state': {
 			'type': 'string',
 			'default': 'inactive',
 			'allowed': [
-				"""
-				Not available to be claimed yet. If this task
-				has dependencies, then the last dependency to
-				finish will set the state of this task to
-				`available` after it successfully terminates.
-				"""
+				# Not available to be claimed yet. If this task
+				# has dependencies, then the last dependency to
+				# finish will set the state of this task to
+				# `available` after it successfully terminates.
 				'inactive',
 
-				"""
-				Waiting to be claimed by a worker.
-				"""
+				# Waiting to be claimed by a worker.
 				'available',
 
-				"""
-				Currently being run by a worker.
-				"""
+				#Currently being run by a worker.
 				'running',
 
-				"""
-				The server puts a task in this state when it is
-				cancelled while in the `running` state. The
-				state will be changed to `cancelled` or
-				`terminated` once the worker delivers an update.
-				"""
+				# The server puts a task in this state when it
+				# is cancelled while in the `running` state.
+				# The state will be changed to `cancelled` or
+				# `terminated` once the worker delivers an
+				# update.
 				'pending_cancellation',
 
-				"""
-				Either cancelled directly by the user or
-				invalidated as a result of one of the parent
-				tasks being cancelled or terminating
-				unsuccessfully.
-				"""
+				# Either cancelled directly by the user or
+				# invalidated as a result of one of the parent
+				# tasks being cancelled or terminating
+				# unsuccessfully.
 				'cancelled',
 
-				"""
-				Finished executing (either successfully or
-				unsuccessfully).
-				"""
+				# Finished executing (either successfully or
+				# unsuccessfully).
 				'terminated'
 			]
 		},
@@ -242,54 +236,44 @@ tasks = {
 			}
 		},
 
-		"""
-		This field is not required, and we don't enforce that the task
-		terminates within the amount of time given below. Its purpose
-		is to allow the user to compute time estimates for task chains.
-		"""
+		# This field is not required, and we don't enforce that the task
+		# terminates within the amount of time given below. Its purpose
+		# is to allow the user to compute time estimates for task
+		# chains.
 		'estimated_runtime': {
 			'type': 'string',
 			'regex': time_regex,
 			'maxlength': max_time_string_length,
 
-			"""
-			If this task is being used as a task group (i.e. it has
-			one or more continuations but no command), then it
-			makes no sense for the user to provide a value for this
-			field.
-			"""
+			# If this task is being used as a task group (i.e. it
+			# has one or more continuations but no command), then it
+			# makes no sense for the user to provide a value for
+			# this field.
 			'dependencies': ['command']
 		},
 
 		'requested_resources': {
 			'type': 'dict',
-			'required': True,
 			'dependencies': ['command'],
 			'schema': resource_info
 		},
 
-		"""
-		The amount of time a worker will wait for a task to terminate
-		after sending it SIGTERM before resorting to using SIGKILL.
-		"""
+		# The amount of time a worker will wait for a task to terminate
+		# after sending it SIGTERM before resorting to using SIGKILL.
 		'max_termination_time': {
 			'type': 'string',
 			'regex': time_regex,
 			'maxlength': max_time_string_length,
 			'dependencies': ['command'],
 
-			"""
-			We are generous with the default cancellation time, in
-			case the woker must write a large amount of information
-			to a slow disk.
-			"""
+			# We are generous with the default cancellation time, in
+			# case the woker must write a large amount of
+			# information to a slow disk.
 			'default': '10 minutes'
 		},
 
-		"""
-		The number of times we will put a task back on the queue if we
-		find that it terminates unsuccessfully.
-		"""
+		# The number of times we will put a task back on the queue if we
+		# find that it terminates unsuccessfully.
 		'max_retry_count': {
 			'type': 'integer',
 			'min': 0,
@@ -297,15 +281,11 @@ tasks = {
 			'dependencies': ['command']
 		},
 
-		"""
-		Information managed by the server.
-		"""
+		# Information managed by the server.
 
-		"""
-		The number of times this task has been rerun after terminating
-		unsuccessfully. Once this counter reaches `max_retry_count`,
-		this task will no longer be rerun.
-		"""
+		# The number of times this task has been rerun after terminating
+		# unsuccessfully. Once this counter reaches `max_retry_count`,
+		# this task will no longer be rerun.
 		'retry_count': {
 			'type': 'integer',
 			'min': 0,
@@ -313,11 +293,9 @@ tasks = {
 			'readonly': True
 		},
 
-		"""
-		If this counter is greater than zero, then the state of the
-		task should be `inactive`. Once the count reaches zero, the
-		state of the task should be changed to `available`.
-		"""
+		# If this counter is greater than zero, then the state of the
+		# task should be `inactive`. Once the count reaches zero, the
+		# state of the task should be changed to `available`.
 		'pending_dependency_count': {
 			'type': 'integer',
 			'min': 0,
@@ -325,21 +303,20 @@ tasks = {
 			'readonly': True
 		},
 
-		"""
-		Since `max_retry_count` may be set to a positive value, a task
-		may be executed more than once. Rather than wiping out the
-		prior execution history of a task each time it is rerun, we
-		append another instance of `execution_info` to the `history`
-		list. This provides the user with more information about why a
-		task may have failed.
-
-		This field is set to `readonly`, because workers do not write
-		updates to it directly. A worker should not have to be aware of
-		the current execution history of a task in order to append more
-		information to it. This level of abstraction is implemented by
-		having the worker post updates to a virtual subresource of
-		`tasks` that models the structure of `execution_info`.
-		"""
+		# Since `max_retry_count` may be set to a positive value, a task
+		# may be executed more than once. Rather than wiping out the
+		# prior execution history of a task each time it is rerun, we
+		# append another instance of `execution_info` to the `history`
+		# list. This provides the user with more information about why a
+		# task may have failed.
+		#
+		# This field is set to `readonly`, because workers do not write
+		# updates to it directly. A worker should not have to be aware
+		# of the current execution history of a task in order to append
+		# more information to it. This level of abstraction is
+		# implemented by having the worker post updates to a virtual
+		# subresource of `tasks` that models the structure of
+		# `execution_info`.
 		'history': {
 			'type': 'list',
 			'readonly': True,
