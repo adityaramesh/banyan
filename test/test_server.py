@@ -15,7 +15,7 @@ from pymongo import Connection
 class EntryPoint:
 	def __init__(self):
 		self.ip = socket.gethostbyname(socket.gethostname())
-		self.base_url = 'http://' + get_ip() + ':5000'
+		self.base_url = 'http://' + self.ip + ':5000'
 
 def resource_url(entry_point, resource):
 	return '/'.join([entry_point.base_url, resource])
@@ -38,16 +38,22 @@ def patch(entry_point, resource, item, update):
 	return requests.patch(url, headers=headers, data=json.dumps(update))
 
 class TestTaskCreation(unittest.TestCase):
-	def __init__(self):
+	def __init__(self, *args, **kwargs):
 		self.db_conn = Connection()
+		self.db = self.db_conn['banyan']
 		self.entry_point = EntryPoint()
+		super().__init__(*args, **kwargs)
 
-	# Drop the banyan database so that each test is idempotent.
-	def drop_database():
-		self.db_conn.drop_database('banyan')
+	# Used to drop the 'tasks' collection so that each test is independent.
+	def drop_tasks(self):
+		self.db.drop_collection('tasks')
 
-	def test_creation_without_continuations(self):
-		self.drop_database()
+	def test_creation(self):
+		self._test_creation_without_continuations()
+		self._test_creation_with_continuations()
+
+	def _test_creation_without_continuations(self):
+		self.drop_tasks()
 
 		ops = [
 			(
@@ -109,59 +115,65 @@ class TestTaskCreation(unittest.TestCase):
 	# after the parent is put in the available state, check that both continuations
 	# are run.
 	# TODO check for failure if either of the continuations is active when added.
-	def test_creation_with_continuations(self):
-		#drop_database()
+	def _test_creation_with_continuations(self):
+		#drop_tasks()
 		pass
 
 	def test_updates(self):
-		test_command_updates()
-		test_state_updates()
-		test_resource_updates()
-		test_continuation_updates()
+		self._test_command_updates()
+		self._test_state_updates()
+		self._test_resource_updates()
+		self._test_continuation_updates()
 
 	# TODO: test that making changes while the task is available fails
 	# TODO: test that changing the command after the task was created with
 	# the no command or requested resources fails.
-	def test_command_updates():
-		#self.drop_database()
+	def _test_command_updates(self):
+		#self.drop_tasks()
 		pass
 
-	# TODO: test that for a task with no command, the state change inactive
-	# -> available results in the task immediately being put in the
-	# terminated state. Don't make tests involving nonempty commands; this
-	# involves the client.
-	def test_state_updates():
-		template = "Option: {}. Input: {}. Response: {}."
+	def _test_state_updates(self):
+		post_msg = "Unexpected response to POST request. Input: {}. Response: {}."
+		patch_msg = "Unexpected result when changing state from '{}' to '{}'. Input: {}. " \
+			"Response: {}."
+
 		initial_states = ['inactive', 'available']
 		terminal_states = ['inactive', 'available', 'running', 'pending_cancellation',
 			'cancelled', 'terminated']
 
 		for si, sf in product(initial_states, terminal_states):
-			self.drop_database()
+			self.drop_tasks()
 
 			task = {'name': 'test'}
-			resp_1 = post('tasks', doc_1)
-			json_1 = resp_1.json()
-			msg_1 = template.format('post', task, json_1)
-			print(json_1)
-			#self.assertEqual(resp_1.status_code, requests.codes.created, msg=msg_1)
+			resp = post(self.entry_point, 'tasks', task)
+			resp_json = resp.json()
+			fail_msg = post_msg.format(task, resp_json)
+			self.assertEqual(resp.status_code, requests.codes.created, msg=fail_msg)
 
-			update = {'status': sf}
-			resp_2 = patch('tasks/{}'.format(json_1['_id']), update)
-			msg_2 = template.format('patch', update, resp_2.json())
-			print(resp_2.json())
-			# TODO some assertion about the state obtained from the response
+			update = {'state': sf}
+			resp = patch(self.entry_point, 'tasks', resp_json['_id'], update)
+			resp_json = resp.json()
+			fail_msg = patch_msg.format(si, sf, update, resp_json)
+
+			if si == sf or sf == 'cancelled' or (si == 'inactive' and sf == 'available'):
+				self.assertEqual(resp.status_code,
+					requests.codes.ok,
+					msg=fail_msg)
+			else:
+				self.assertEqual(resp.status_code,
+					requests.codes.unprocessable_entity,
+					msg=fail_msg)
 
 	# TODO check that updates to the fields listed in the readme when the
 	# task is in the `available` state fail.
-	def test_resource_updates():
-		#self.drop_database()
+	def _test_resource_updates(self):
+		#self.drop_tasks()
 		pass
 
 	# TODO same as continuation test for task creation, except now we
 	# create the task with no continuations initially.
-	def test_continuation_updates():
-		#self.drop_database()
+	def _test_continuation_updates(self):
+		#self.drop_tasks()
 		pass
 
 if __name__ == '__main__':
