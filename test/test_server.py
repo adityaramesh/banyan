@@ -9,8 +9,15 @@ import requests
 import json
 import unittest
 
+# Allows us to import the 'banyan' module.
+import os
+import sys
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
+
+from copy import deepcopy
 from itertools import product
 from pymongo import Connection
+from banyan.server.validation import LEGAL_USER_STATE_TRANSITIONS
 
 class EntryPoint:
 	def __init__(self):
@@ -42,6 +49,10 @@ class TestTaskCreation(unittest.TestCase):
 		self.db_conn = Connection()
 		self.db = self.db_conn['banyan']
 		self.entry_point = EntryPoint()
+
+		self.post_fail_msg = "Unexpected response to POST request. Input: {}. Response: {}."
+		self.patch_fail_msg = "Unexpected response to PATCH request to change '{}' from " \
+			"'{}' to '{}'. Input: {}. Response: {}."
 		super().__init__(*args, **kwargs)
 
 	# Used to drop the 'tasks' collection so that each test is independent.
@@ -108,9 +119,9 @@ class TestTaskCreation(unittest.TestCase):
 		]
 
 		for doc, expected_status in ops:
-			response = post(self.entry_point, 'tasks', doc)
-			message = "Input: {}. Response: {}.".format(doc, response.json())
-			self.assertEqual(response.status_code, expected_status, msg=message)
+			resp = post(self.entry_point, 'tasks', doc)
+			fail_msg = self.post_fail_msg.format(doc, resp.json())
+			self.assertEqual(resp.status_code, expected_status, msg=fail_msg)
 
 	# TODO for the test, use a task with no command and two continuations.
 	# after the parent is put in the available state, check that both continuations
@@ -121,10 +132,10 @@ class TestTaskCreation(unittest.TestCase):
 		pass
 
 	def test_updates(self):
-		self._test_command_updates()
-		self._test_state_updates()
+		#self._test_command_updates()
+		#self._test_state_updates()
 		self._test_resource_updates()
-		self._test_continuation_updates()
+		#self._test_continuation_updates()
 
 	# TODO: test that making changes while the task is available fails
 	# TODO: test that changing the command after the task was created with
@@ -134,10 +145,6 @@ class TestTaskCreation(unittest.TestCase):
 		pass
 
 	def _test_state_updates(self):
-		post_msg = "Unexpected response to POST request. Input: {}. Response: {}."
-		patch_msg = "Unexpected result when changing state from '{}' to '{}'. Input: {}. " \
-			"Response: {}."
-
 		initial_states = ['inactive', 'available']
 		terminal_states = ['inactive', 'available', 'running', 'pending_cancellation',
 			'cancelled', 'terminated']
@@ -148,15 +155,14 @@ class TestTaskCreation(unittest.TestCase):
 			task = {'name': 'test', 'state': si}
 			resp = post(self.entry_point, 'tasks', task)
 			resp_json = resp.json()
-			fail_msg = post_msg.format(task, resp_json)
+			fail_msg = self.post_fail_msg.format(task, resp_json)
 			self.assertEqual(resp.status_code, requests.codes.created, msg=fail_msg)
 
 			update = {'state': sf}
 			resp = patch(self.entry_point, 'tasks', resp_json['_id'], update)
-			resp_json = resp.json()
-			fail_msg = patch_msg.format(si, sf, update, resp_json)
+			fail_msg = self.patch_fail_msg.format('state', si, sf, update, resp.json())
 
-			if si == sf or sf == 'cancelled' or (si == 'inactive' and sf == 'available'):
+			if sf in LEGAL_USER_STATE_TRANSITIONS[si]:
 				self.assertEqual(resp.status_code,
 					requests.codes.ok,
 					msg=fail_msg)
@@ -165,11 +171,105 @@ class TestTaskCreation(unittest.TestCase):
 					requests.codes.unprocessable_entity,
 					msg=fail_msg)
 
-	# TODO check that updates to the fields listed in the readme when the
-	# task is in the `available` state fail.
 	def _test_resource_updates(self):
-		#self.drop_tasks()
-		pass
+		"""
+		Here, we verify that the behavior when attempting to change
+		various fields of a task is as expected. In particular:
+		1. Setting any field to its current value (e.g. a no-op) should
+		   always work.
+		2. While a task is in the `inactive` state, modifying any field
+		   that is not marked `readonly` should work.
+		3. If a task is not in the `inactive` state, then any attempt to
+		   modify the value of a `readonly` or `createonly` field should
+		   fail.
+		"""
+
+		states = ['inactive', 'available']
+
+		changes = [
+			(
+				{'estimated_runtime': '10 minutes'},
+				{'estimated_runtime': '20 minutes'}
+			),
+			(
+				# The 'cores' field is already set to 1 by
+				# default, so if we don't include it in the
+				# PATCH request, we would essentially be asking
+				# the server to delete it. This will result in
+				# response of 422.
+				{'requested_resources': {'memory': '1 GiB', 'cores': 1}},
+				{'requested_resources': {'memory': '2 GiB', 'cores': 1}}
+			),
+			(
+				{'max_termination_time': '10 minutes'},
+				{'max_termination_time': '20 minutes'}
+			),
+			(
+				{'max_retry_count': 1},
+				{'max_retry_count': 2}
+			)
+		]
+
+		basic_task = {
+			'command': 'test',
+			'requested_resources': {'memory': '1 GiB'}
+		}
+
+		# Case (1).
+		for state, change in product(states, changes):
+			self.drop_tasks()
+			init, _ = change
+
+			# The RHS is the union of the arguments.
+			task = dict(basic_task, **dict(init, **{'state': state}))
+			resp = post(self.entry_point, 'tasks', task)
+			resp_json = resp.json()
+			fail_msg = self.post_fail_msg.format(task, resp_json)
+			self.assertEqual(resp.status_code, requests.codes.created, msg=fail_msg)
+			
+			resp = patch(self.entry_point, 'tasks', resp_json['_id'], init)
+			key, value = next(iter(init.items()))
+			fail_msg = self.patch_fail_msg.format(key, value, value, init, resp.json())
+			self.assertEqual(resp.status_code, requests.codes.ok, msg=fail_msg)
+
+		## Case (2).
+		for change in changes:
+			self.drop_tasks()
+			init, final = change
+
+			# The RHS is the union of the arguments.
+			task = dict(basic_task, **init)
+			resp = post(self.entry_point, 'tasks', task)
+			resp_json = resp.json()
+			fail_msg = self.post_fail_msg.format(task, resp_json)
+			self.assertEqual(resp.status_code, requests.codes.created, msg=fail_msg)
+			
+			resp = patch(self.entry_point, 'tasks', resp_json['_id'], final)
+			key, vi = next(iter(init.items()))
+			vf = next(iter(final.values()))
+
+			fail_msg = self.patch_fail_msg.format(key, vi, vf, final, resp.json())
+			self.assertEqual(resp.status_code, requests.codes.ok, msg=fail_msg)
+
+		# Case (3).
+		for change in changes:
+			self.drop_tasks()
+			init, final = change
+
+			# The RHS is the union of the arguments.
+			task = dict(basic_task, **dict(init, **{'state': 'available'}))
+			resp = post(self.entry_point, 'tasks', task)
+			resp_json = resp.json()
+			fail_msg = self.post_fail_msg.format(task, resp_json)
+			self.assertEqual(resp.status_code, requests.codes.created, msg=fail_msg)
+			
+			resp = patch(self.entry_point, 'tasks', resp_json['_id'], final)
+			key, vi = next(iter(init.items()))
+			vf = next(iter(final.values()))
+
+			fail_msg = self.patch_fail_msg.format(key, vi, vf, final, resp.json())
+			self.assertEqual(resp.status_code, requests.codes.unprocessable_entity, \
+				msg=fail_msg)
 
 	# TODO same as continuation test for task creation, except now we
 	# create the task with no continuations initially.

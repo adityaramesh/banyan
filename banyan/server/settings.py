@@ -4,6 +4,8 @@
 Configuration settings for the server.
 """
 
+DEBUG = True
+
 import os
 
 """
@@ -188,14 +190,16 @@ tasks = {
 		'command': {
 			'type': 'string',
 			'maxlength': max_command_string_length,
-			'empty': False
+			'empty': False,
+			'createonly': True
 		},
 
 		'name': {
 			'type': 'string',
 			'maxlength': max_name_string_length,
 			'empty': False,
-			'unique': True
+			'unique': True,
+			'createonly': True
 		},
 
 		# If a task has no parents, the user can optionally create it
@@ -239,6 +243,7 @@ tasks = {
 			'type': 'list',
 			'maxlength': max_task_list_length,
 			'default': [],
+			'createonly': True,
 			'schema': {
 				'type': 'objectid',
 				'data_relation': {'resource': 'tasks'}
@@ -253,6 +258,7 @@ tasks = {
 			'type': 'string',
 			'regex': time_regex,
 			'maxlength': max_time_string_length,
+			'createonly': True,
 
 			# If this task is being used as a task group (i.e. it
 			# has one or more continuations but no command), then it
@@ -264,6 +270,7 @@ tasks = {
 		'requested_resources': {
 			'type': 'dict',
 			'dependencies': ['command'],
+			'createonly': True,
 			'schema': resource_info
 		},
 
@@ -274,6 +281,7 @@ tasks = {
 			'regex': time_regex,
 			'maxlength': max_time_string_length,
 			'dependencies': ['command'],
+			'createonly': True,
 
 			# We are generous with the default cancellation time, in
 			# case the woker must write a large amount of
@@ -287,7 +295,8 @@ tasks = {
 			'type': 'integer',
 			'min': 0,
 			'default': 0,
-			'dependencies': ['command']
+			'dependencies': ['command'],
+			'createonly': True
 		},
 
 		# Information managed by the server.
