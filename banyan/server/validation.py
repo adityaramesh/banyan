@@ -49,11 +49,6 @@ class Validator(Validator):
 		assert not update, "Expected 'validate_update' to be called for updates " \
 			"instead of 'validate' with 'update=True'."
 
-		if 'command' in document and 'requested_resources' not in document:
-			self._error('command', "'requested_resources' should be provided if " \
-				"'command' is provided.")
-			return False
-
 		if 'state' in document and document['state'] not in ['inactive', 'available']:
 			self._error('state', "Tasks can only be created in the 'inactive' and " \
 				"'available' states.")
@@ -65,16 +60,6 @@ class Validator(Validator):
 	Called after each PATCH request, e.g. when a task is updated in some way.
 	"""
 	def validate_update(self, document, _id, original_document=None):
-		has_command = 'command' in original_document or 'command' in document
-		has_resources = ('requested_resources' in original_document and \
-			'memory' in original_document['requested_resources']) or \
-			'requested_resources' in document
-		
-		if has_command and not has_resources:
-			self._error('command', "'requested_resources' should be provided if "
-				"'command' is provided.")
-			return False
-
 		if 'state' in document:
 			si = original_document['state']
 			sf = document['state']

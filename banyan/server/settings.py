@@ -191,7 +191,8 @@ tasks = {
 			'type': 'string',
 			'maxlength': max_command_string_length,
 			'empty': False,
-			'createonly': True
+			'createonly': True,
+			'dependencies': ['requested_resources']
 		},
 
 		'name': {

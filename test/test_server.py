@@ -60,9 +60,9 @@ class TestTaskCreation(unittest.TestCase):
 		self.db.drop_collection('tasks')
 
 	def test_creation(self):
-		pass
-		#self._test_creation_without_continuations()
+		self._test_creation_without_continuations()
 		#self._test_creation_with_continuations()
+		pass
 
 	def _test_creation_without_continuations(self):
 		self.drop_tasks()
@@ -132,17 +132,9 @@ class TestTaskCreation(unittest.TestCase):
 		pass
 
 	def test_updates(self):
-		#self._test_command_updates()
-		#self._test_state_updates()
+		self._test_state_updates()
 		self._test_resource_updates()
 		#self._test_continuation_updates()
-
-	# TODO: test that making changes while the task is available fails
-	# TODO: test that changing the command after the task was created with
-	# the no command or requested resources fails.
-	def _test_command_updates(self):
-		#self.drop_tasks()
-		pass
 
 	def _test_state_updates(self):
 		initial_states = ['inactive', 'available']
