@@ -12,21 +12,30 @@ class Validator(Validator):
 		)
 
 	def validate(self, document, schema=None, update=False, context=None):
-		if (not update and not self.validate_creation(document)) or \
-		   (update and self.validate_update(document)):
+		if not check_common_constraints(self, document):
 			return False
+		if (not update and not self.check_creation_constraints(document)) or \
+		   (update and self.check_update_constraints(document)):
 			return False
+
 		return super().validate(document, schema, update, context)
 
-	def validate_creation(self, document):
-		if 'state' in document and document['state'] not in ['inactive', 'available']:
-			self._error("Tasks can only be created in the " \
-				"'inactive' and 'available' states.")
+	"""
+	Checks constraints that should always hold for any given task.
+	"""
+	def check_common_constraints(self, document):
+		if 'command' in document and not 'requested_resources' in document:
+			self._error('command', "'requested_resources' must be provided if " \
+				"'command' is provided.")
 			return False
 
-		if 'command' in document and not 'requested_resources' in document:
-			self._error('command', "'requested_resources' must " \
-				"be provided if 'command' is provided.")
+	"""
+	Checks constaints that should hold when a task is created.
+	"""
+	def check_creation_constraints(self, document):
+		if 'state' in document and document['state'] not in ['inactive', 'available']:
+			self._error("Tasks can only be created in the 'inactive' and 'available'" \
+				"states.")
 			return False
 
 		# TODO implement acquire/release for continuations
@@ -34,7 +43,10 @@ class Validator(Validator):
 
 		return True
 
-	def validate_update(self, document):
+	"""
+	Checks constraints that should hold when a task is updated.
+	"""
+	def check_update_constraints(self, document):
 		# TODO disallow illegal state transitions
 		# TODO disallow mutation of fields listed in README
 		return True
