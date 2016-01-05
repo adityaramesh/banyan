@@ -158,14 +158,16 @@ when various prerequisites are fulfilled.
   to do.
 
 - Allowable state changes:
+  - Any state to itself
   - Inactive to:
     - Available
+    - Cancelled
   - Available to:
     - Running
     - Cancelled
   - Running to:
     - Terminated
-    - Pending Cancellation
+    - Cancelled (actually puts the task in 'Pending Cancellation' state)
   - Pending Cancellation to:
     - Terminated
     - Cancelled
