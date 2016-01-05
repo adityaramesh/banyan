@@ -15,4 +15,5 @@ def get_ip():
 
 if __name__ == '__main__':
 	app = Eve(validator=Validator)
+	# on_insert_tasks
 	app.run(host=get_ip(), port=5000)

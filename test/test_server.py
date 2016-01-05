@@ -16,7 +16,7 @@ sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 from copy import deepcopy
 from itertools import product
-from pymongo import Connection
+from pymongo import MongoClient
 from banyan.server.validation import LEGAL_USER_STATE_TRANSITIONS
 
 class EntryPoint:
@@ -46,8 +46,8 @@ def patch(entry_point, resource, item, update):
 
 class TestTaskCreation(unittest.TestCase):
 	def __init__(self, *args, **kwargs):
-		self.db_conn = Connection()
-		self.db = self.db_conn['banyan']
+		self.db_client = MongoClient()
+		self.db = self.db_client['banyan']
 		self.entry_point = EntryPoint()
 
 		self.post_fail_msg = "Unexpected response to POST request. Input: {}. Response: {}."
@@ -61,8 +61,7 @@ class TestTaskCreation(unittest.TestCase):
 
 	def test_creation(self):
 		self._test_creation_without_continuations()
-		#self._test_creation_with_continuations()
-		pass
+		self._test_creation_with_continuations()
 
 	def _test_creation_without_continuations(self):
 		self.drop_tasks()
@@ -123,18 +122,39 @@ class TestTaskCreation(unittest.TestCase):
 			fail_msg = self.post_fail_msg.format(doc, resp.json())
 			self.assertEqual(resp.status_code, expected_status, msg=fail_msg)
 
-	# TODO for the test, use a task with no command and two continuations.
-	# after the parent is put in the available state, check that both continuations
-	# are run.
-	# TODO check for failure if either of the continuations is active when added.
+	# TODO After the parents are made available, check that the
+	# continuations are run.
 	def _test_creation_with_continuations(self):
-		#drop_tasks()
-		pass
+		self.drop_tasks()
+
+		parents = []
+		children = [
+			{'name': 'child 1'},
+			{'name': 'child 2', 'state': 'available'}
+		]
+
+		for i, child in enumerate(children):
+			resp = post(self.entry_point, 'tasks', child)
+			json = resp.json()
+			fail_msg = self.post_fail_msg.format(child, json)
+			self.assertEqual(resp.status_code, requests.codes.created, msg=fail_msg)
+
+			parents.append({
+				'name': 'parent {}'.format(i),
+				'continuations': [json['_id']]
+			})
+
+		expected_codes = [requests.codes.created, requests.codes.unprocessable_entity]
+
+		for parent, code in zip(parents, expected_codes):
+			resp = post(self.entry_point, 'tasks', parent)
+			fail_msg = self.post_fail_msg.format(parent, resp.json())
+			self.assertEqual(resp.status_code, code, msg=fail_msg)
 
 	def test_updates(self):
 		self._test_state_updates()
 		self._test_resource_updates()
-		#self._test_continuation_updates()
+		self._test_continuation_updates()
 
 	def _test_state_updates(self):
 		initial_states = ['inactive', 'available']
@@ -224,7 +244,7 @@ class TestTaskCreation(unittest.TestCase):
 			fail_msg = self.patch_fail_msg.format(key, value, value, init, resp.json())
 			self.assertEqual(resp.status_code, requests.codes.ok, msg=fail_msg)
 
-		## Case (2).
+		# Case (2).
 		for change in changes:
 			self.drop_tasks()
 			init, final = change
@@ -263,11 +283,37 @@ class TestTaskCreation(unittest.TestCase):
 			self.assertEqual(resp.status_code, requests.codes.unprocessable_entity, \
 				msg=fail_msg)
 
-	# TODO same as continuation test for task creation, except now we
-	# create the task with no continuations initially.
+	# TODO After the parents are made available, check that the
+	# continuations are run.
 	def _test_continuation_updates(self):
-		#self.drop_tasks()
-		pass
+		self.drop_tasks()
+
+		parents = [
+			{'name': 'parent 1'},
+			{'name': 'parent 2'}
+		]
+		children = [
+			{'name': 'child 1'},
+			{'name': 'child 2', 'state': 'available'}
+		]
+		ids = []
+
+		for i, task in enumerate(parents + children):
+			resp = post(self.entry_point, 'tasks', task)
+			json = resp.json()
+			fail_msg = self.post_fail_msg.format(task, json)
+			self.assertEqual(resp.status_code, requests.codes.created, msg=fail_msg)
+			ids.append(json['_id'])
+
+		expected_codes = [requests.codes.ok, requests.codes.unprocessable_entity]
+
+		for i, code in enumerate(expected_codes):
+			child_id = ids[i + 2]
+			update = {'continuations': [child_id]}
+			resp = patch(self.entry_point, 'tasks', ids[i], update)
+			fail_msg = self.patch_fail_msg.format('continuations', '[]', \
+				'[{}]'.format(child_id), update, resp.json())
+			self.assertEqual(resp.status_code, code, msg=fail_msg)
 
 if __name__ == '__main__':
 	unittest.main()

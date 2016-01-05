@@ -1,4 +1,6 @@
 from eve.io.mongo import Validator
+from pymongo import MongoClient
+from bson import ObjectId
 
 """
 See `notes/specification.md` for more information about state transitions.
@@ -25,6 +27,9 @@ LEGAL_WORKER_STATE_TRANSITIONS = {
 class Validator(Validator):
 	def __init__(self, schema=None, resource=None, allow_unknown=False,
 		transparent_schema_rules=False):
+
+		self.db_client = MongoClient()
+		self.db = self.db_client['banyan']
 
 		super().__init__(
 			schema=schema,
@@ -54,7 +59,31 @@ class Validator(Validator):
 				"'available' states.")
 			return False
 
-		return super().validate(document, schema, update, context)
+		# We call the parent's `validate` function now, so that we can
+		# ensure that all ObjectIDs for continuations are valid.
+		if not super().validate(document, schema, update, context):
+			return False
+
+		return self.validate_continuations(document)
+
+	def validate_continuations(self, document):
+		if 'continuations' in document:
+			children = [self.db['tasks'].find_one({'_id': ObjectId(cont_id)}) for \
+				cont_id in document['continuations']]
+			for child in children:
+				if not self.validate_continuation(child):
+					return False
+		return True
+
+	def validate_continuation(self, child):
+		state = child['state']
+
+		if state != 'inactive':
+			self._error('continuations', "Continuation '{}' should be 'inactive', but " \
+				"is in the '{}' state.".format(child['_id'], state))
+			return False
+
+		return True
 
 	"""
 	Called after each PATCH request, e.g. when a task is updated in some way.
@@ -65,13 +94,19 @@ class Validator(Validator):
 			sf = document['state']
 
 			# TODO: incorporate legal_worker_transitions once
-			# workers can be authenticated.
+			# workers can be authenticated. but test this later in
+			# test_worker.py.
 			if sf not in LEGAL_USER_STATE_TRANSITIONS[si]:
 				self._error('state', "Illegal state transition from '{}' to '{}'.". \
 					format(si, sf))
 				return False
 
-		return super().validate_update(document, _id, original_document)
+		# We call the parent's `validate_update` function now, so that
+		# we can ensure that all ObjectIDs for continuations are valid.
+		if not super().validate_update(document, _id, original_document):
+			return False
+
+		return self.validate_continuations(document)
 
 	"""
 	In the schema defined in `settings.py`, a field that is marked
