@@ -6,14 +6,13 @@ falling under the purview of REST.
 """
 
 import continuation
-from pymongo import MongoClient
+from flask import current_app as app
 
 # TODO work-stealing, cancellation, termination, etc.
 
 class EventHooks:
 	def __init__(self, app):
-		self.db_client = MongoClient()
-		self.db = self.db_client['banyan']
+		self.db = app.data.driver.db
 
 		app.on_insert_tasks   += self.task_insert
 		app.on_inserted_tasks += self.task_inserted

@@ -4,8 +4,8 @@
 Validator with additional constraints that are not covered by Eve.
 """
 
+from flask import current_app as app
 from eve.io.mongo import Validator
-from pymongo import MongoClient
 from bson import ObjectId
 
 """
@@ -34,8 +34,7 @@ class Validator(Validator):
 	def __init__(self, schema=None, resource=None, allow_unknown=False,
 		transparent_schema_rules=False):
 
-		self.db_client = MongoClient()
-		self.db = self.db_client['banyan']
+		self.db = app.data.driver.db
 
 		super().__init__(
 			schema=schema,
