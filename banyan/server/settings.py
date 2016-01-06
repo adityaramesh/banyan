@@ -191,7 +191,7 @@ tasks = {
 			'type': 'string',
 			'maxlength': max_command_string_length,
 			'empty': False,
-			'createonly': True,
+			'mutable_iff_inactive': True,
 			'dependencies': ['requested_resources']
 		},
 
@@ -200,7 +200,7 @@ tasks = {
 			'maxlength': max_name_string_length,
 			'empty': False,
 			'unique': True,
-			'createonly': True
+			'mutable_iff_inactive': True
 		},
 
 		# If a task has no parents, the user can optionally create it
@@ -244,7 +244,7 @@ tasks = {
 			'type': 'list',
 			'maxlength': max_task_list_length,
 			'default': [],
-			'createonly': True,
+			'creatable_iff_inactive': True,
 			'schema': {
 				'type': 'objectid',
 				'data_relation': {'resource': 'tasks'}
@@ -259,7 +259,7 @@ tasks = {
 			'type': 'string',
 			'regex': time_regex,
 			'maxlength': max_time_string_length,
-			'createonly': True,
+			'mutable_iff_inactive': True,
 
 			# If this task is being used as a task group (i.e. it
 			# has one or more continuations but no command), then it
@@ -271,7 +271,7 @@ tasks = {
 		'requested_resources': {
 			'type': 'dict',
 			'dependencies': ['command'],
-			'createonly': True,
+			'mutable_iff_inactive': True,
 			'schema': resource_info
 		},
 
@@ -282,7 +282,7 @@ tasks = {
 			'regex': time_regex,
 			'maxlength': max_time_string_length,
 			'dependencies': ['command'],
-			'createonly': True,
+			'mutable_iff_inactive': True,
 
 			# We are generous with the default cancellation time, in
 			# case the woker must write a large amount of
@@ -297,7 +297,7 @@ tasks = {
 			'min': 0,
 			'default': 0,
 			'dependencies': ['command'],
-			'createonly': True
+			'mutable_iff_inactive': True
 		},
 
 		# Information managed by the server.

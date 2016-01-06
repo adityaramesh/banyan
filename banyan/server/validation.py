@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+
+"""
+Validator with additional constraints that are not covered by Eve.
+"""
+
 from eve.io.mongo import Validator
 from pymongo import MongoClient
 from bson import ObjectId
@@ -18,7 +24,7 @@ LEGAL_USER_STATE_TRANSITIONS = {
 LEGAL_WORKER_STATE_TRANSITIONS = {
 	'inactive': ['inactive'],
 	'available': ['available', 'running'],
-	'running': ['running', 'cancelled', 'terminated'],
+	'running': ['running', 'terminated'],
 	'pending_cancellation': ['pending_cancellation', 'cancelled', 'terminated'],
 	'cancelled': ['cancelled'],
 	'terminated': ['terminated']
@@ -68,8 +74,14 @@ class Validator(Validator):
 
 	def validate_continuations(self, document):
 		if 'continuations' in document:
+			cont_list = document['continuations']
+
+			if not len(set(cont_list)) == len(cont_list):
+				self._error('continuations', "List contains duplicates.")
+				return False
+
 			children = [self.db['tasks'].find_one({'_id': ObjectId(cont_id)}) for \
-				cont_id in document['continuations']]
+				cont_id in cont_list]
 			for child in children:
 				if not self.validate_continuation(child):
 					return False
@@ -110,11 +122,32 @@ class Validator(Validator):
 
 	"""
 	In the schema defined in `settings.py`, a field that is marked
-	`createonly` may only be changed while the task is still in the
-	`inactive` state. This function is used to enforce this.
+	`mutable_iff_inactive` may only be initialized while the task is still
+	in the `inactive` state. This function enforces this.
 	"""
-	def _validate_createonly(self, createonly, field, value):
-		if not createonly or not self._original_document or \
+	def _validate_creatable_iff_inactive(self, createonly, field, value):
+		if not createonly or not self._original_document:
+			return True
+
+		if self._original_document['state'] != 'inactive':
+			self._error(field, "Cannot set field '{}' when task is no longer in " \
+				"'inactive' state.".format(field))
+			return False
+		
+		if field in self._original_document:
+			self._error(field, "Cannot modify field '{}' once it has been set.". \
+				format(field))
+			return False
+
+		return True
+
+	"""
+	In the schema defined in `settings.py`, a field that is marked
+	`mutable_iff_inactive` may only be changed while the task is still in
+	the `inactive` state. This function enforces this.
+	"""
+	def _validate_mutable_iff_inactive(self, mutable, field, value):
+		if not mutable or not self._original_document or \
 			self._original_document['state'] == 'inactive':
 			return True
 
