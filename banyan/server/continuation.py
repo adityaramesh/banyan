@@ -4,8 +4,10 @@
 Implements the bookkeeping to manage dependency chains.
 """
 
+from eve.utils import config
+
 def update_by_id(child_id, db, update):
-	res = db.tasks.update_one({'_id': child_id}, update)
+	res = db.tasks.update_one({config.ID_FIELD: child_id}, update)
 	assert res.modified_count == 1
 
 """
@@ -17,7 +19,7 @@ it. Parameters:
 def acquire(child_id, db):
 	update_by_id(child_id, db, {
 		'$inc': {'pending_dependency_count': 1},
-		'$currentDate': {'_updated': True}
+		'$currentDate': {config.LAST_UPDATED: True}
 	})
 
 """
@@ -27,7 +29,7 @@ continuations.
 - `db`: Handle to the `banyan` database.
 """
 def release(child_id, db):
-	query = {'_id': child_id}
+	query = {config.ID_FIELD: child_id}
 	child = db.tasks.find_one(query)
 
 	assert child['state'] == 'inactive'
@@ -40,14 +42,14 @@ def release(child_id, db):
 					'state': 'available',
 					'pending_dependency_count': 0
 				},
-				'$currentDate': {'_updated': True}
+				'$currentDate': {config.LAST_UPDATED: True}
 			}
 		)
 	else:
 		update_by_id(child_id, db,
 			{
 				'$dec': {'pending_dependency_count': 1},
-				'$currentDate': {'_updated': True}
+				'$currentDate': {config.LAST_UPDATED: True}
 			}
 		)
 
@@ -58,7 +60,7 @@ it.
 - `db`: Handle to the `banyan` database.
 """
 def release_keep_inactive(child_id, db):
-	query = {'_id': child_id}
+	query = {config.ID_FIELD: child_id}
 	child = db.tasks.find_one(query)
 
 	assert child['state'] == 'inactive'
@@ -67,7 +69,7 @@ def release_keep_inactive(child_id, db):
 	update_by_id(child_id, db,
 		{
 			'$dec': {'pending_dependency_count': 1},
-			'$currentDate': {'_updated': True}
+			'$currentDate': {config.LAST_UPDATED: True}
 		}
 	)
 
@@ -80,7 +82,7 @@ the dependency counts).
 - `db`: Handle to the `banyan` database.
 """
 def try_make_available(child_id, db):
-	query = {'_id': child_id}
+	query = {config.ID_FIELD: child_id}
 	child = db.tasks.find_one(query)
 	assert child['state'] == 'inactive'
 

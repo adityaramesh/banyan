@@ -4,6 +4,7 @@
 Configuration settings for the server.
 """
 
+# XXX
 DEBUG = True
 
 import os
@@ -244,6 +245,7 @@ tasks = {
 			'type': 'list',
 			'maxlength': max_task_list_length,
 			'default': [],
+			'allows_duplicates': False,
 			'creatable_iff_inactive': True,
 			'schema': {
 				'type': 'objectid',
@@ -340,6 +342,89 @@ tasks = {
 			'type': 'list',
 			'readonly': True,
 			'schema': execution_info
+		}
+	}
+}
+
+VIRTUAL_RESOURCES = {
+	'tasks': {
+		'add_continuations': {
+			'target': 'continuations',
+			'action': 'append',
+			# Defaults to `['field']`.
+			'accessible_as': ['item', 'field']
+		},
+
+		'remove_continuations': {
+			'target': 'continuations',
+			'action': 'remove',
+			'accessible_as': ['item', 'field']
+		},
+
+		# Virtual subresources for modifying and accessing the history.
+
+		'add_history': {
+			'target': 'history',
+			'action': 'append'
+		},
+
+		'current_history': {
+			'target': 'history/<last>',
+			'action': 'alias',
+			'readonly': True
+		},
+
+		'worker': {
+			'target': 'history/<last>/worker',
+			'action': 'alias'
+		},
+
+		'exit_status': {
+			'target': 'history/<last>/exit_status',
+			'action': 'alias'
+		},
+
+		'time_terminated': {
+			'target': 'history/<last>/time_terminated',
+			'action': 'alias'
+		},
+
+		'time_started': {
+			'target': 'history/<last>/time_started',
+			'action': 'alias'
+		},
+
+		'memory_usage': {
+			'target': 'history/<last>/memory_usage',
+			'action': 'alias',
+			'readonly': True
+		},
+
+		'cpu_utilization': {
+			'target': 'history/<last>/cpu_utilization',
+			'action': 'alias',
+			'readonly': True
+		},
+
+		'gpu_usage': {
+			'target': 'history/<last>/cpu_utilization',
+			'action': 'alias',
+			'readonly': True
+		},
+
+		'report_memory_usage': {
+			'target': 'history/<last>/memory_usage',
+			'action': 'append'
+		},
+
+		'report_cpu_utilization': {
+			'target': 'history/<last>/cpu_utilization',
+			'action': 'append'
+		},
+
+		'report_gpu_usage': {
+			'target': 'history/<last>/cpu_utilization',
+			'action': 'append'
 		}
 	}
 }

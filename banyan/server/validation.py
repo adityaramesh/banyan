@@ -120,6 +120,13 @@ class Validator(Validator):
 		return self.validate_continuations(document)
 
 	"""
+	We enforce uniqueness when creating and modifying the array, so we
+	don't have to do anything here.
+	"""
+	def _validate_allows_duplicates(self, duplicates, field, value):
+		return True
+
+	"""
 	In the schema defined in `settings.py`, a field that is marked
 	`mutable_iff_inactive` may only be initialized while the task is still
 	in the `inactive` state. This function enforces this.

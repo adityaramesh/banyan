@@ -18,8 +18,9 @@ when various prerequisites are fulfilled.
 # Virtual Resources to Implement
 
 - For use by the user:
-  - `tasks/add_continuation`
-  - `tasks/remove_continuation`
+  - `tasks/add_continuations`
+  - `tasks/remove_continuations`
+  - `tasks/current_history`
 
 - TODO: virtual resources for computing statistics.
   - Global virtual resources for global statistics.
@@ -30,6 +31,9 @@ when various prerequisites are fulfilled.
   - `execution_info/exit_status`
   - `execution_info/time_terminated`
   - `execution_info/time_started`
+  - `execution_info/memory_usage`
+  - `execution_info/cpu_utilization`
+  - `execution_info/gpu_usage`
   - `execution_info/report_memory_usage`
   - `execution_info/report_cpu_utilization`
   - `execution_info/report_gpu_usage`
@@ -50,15 +54,16 @@ when various prerequisites are fulfilled.
 
 - Procedure `release_continuations(g)`.
   - For each continuation `c`, call `release_continuation(c)`.
-  - Set the state to `terminated`.
 
 - When a task is created:
   - Check that the state is either `inactive` or `available`.
   - For each continuation `c`, call `acquire_continuation(c)`.
   - If the task has no provided command and is created in the `available`
-    state, then call `release_continuations(self)`.
+    state, then call `release_continuations(self)`. Then set the state to
+    `terminated`.
 
-- Virtual resources involved:
+- Create the following virtual resources for this; make the `continuations`
+  field read-only.
   - `tasks/add_continuation`.
   - `tasks/remove_continuation`.
 
