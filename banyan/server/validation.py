@@ -6,28 +6,27 @@ Validator with additional constraints that are not covered by Eve.
 
 from flask import current_app as app
 from eve.io.mongo import Validator
-from bson import ObjectId
 
 """
 See `notes/specification.md` for more information about state transitions.
 """
 
 LEGAL_USER_STATE_TRANSITIONS = {
-	'inactive': ['inactive', 'available', 'cancelled'],
-	'available': ['available', 'cancelled'],
-	'running': ['running', 'cancelled'],
-	'pending_cancellation': ['pending_cancellation'],
-	'cancelled': ['cancelled'],
-	'terminated': ['terminated']
+	'inactive':             [ 'inactive', 'available', 'cancelled'],
+	'available':            [ 'available', 'cancelled'],
+	'running':              [ 'running', 'cancelled'],
+	'pending_cancellation': [ 'pending_cancellation'],
+	'cancelled':            [ 'cancelled'],
+	'terminated':           [ 'terminated']
 }
 
 LEGAL_WORKER_STATE_TRANSITIONS = {
-	'inactive': ['inactive'],
-	'available': ['available', 'running'],
-	'running': ['running', 'terminated'],
-	'pending_cancellation': ['pending_cancellation', 'cancelled', 'terminated'],
-	'cancelled': ['cancelled'],
-	'terminated': ['terminated']
+	'inactive':             [ 'inactive'],
+	'available':            [ 'available', 'running'],
+	'running':              [ 'running', 'terminated'],
+	'pending_cancellation': [ 'pending_cancellation', 'cancelled', 'terminated'],
+	'cancelled':            [ 'cancelled'],
+	'terminated':           [ 'terminated']
 }
 
 class Validator(Validator):
@@ -73,14 +72,17 @@ class Validator(Validator):
 
 	def validate_continuations(self, document):
 		if 'continuations' in document:
-			cont_list = document['continuations']
+			children = [self.db['tasks'].find_one({'_id': _id}) for _id in \
+				document['continuations']]
 
-			if not len(set(cont_list)) == len(cont_list):
-				self._error('continuations', "List contains duplicates.")
-				return False
+			# It's not practical to check for cyclic dependencies,
+			# but we do perform a basic sanity check.
+			if '_id' in document:
+				if document['_id'] in children:
+					self._error('continuations', "Task cannot have itself " \
+						"as a continuation.")
+					return False
 
-			children = [self.db['tasks'].find_one({'_id': ObjectId(cont_id)}) for \
-				cont_id in cont_list]
 			for child in children:
 				if not self.validate_continuation(child):
 					return False
@@ -113,17 +115,31 @@ class Validator(Validator):
 				return False
 
 		# We call the parent's `validate_update` function now, so that
-		# we can ensure that all ObjectIDs for continuations are valid.
+		# we can ensure that all ObjectIds for continuations are valid.
 		if not super().validate_update(document, _id, original_document):
 			return False
 
 		return self.validate_continuations(document)
 
 	"""
-	We enforce uniqueness when creating and modifying the array, so we
-	don't have to do anything here.
+	Extends the 'empty' rule so that it can also be applied to lists. Taken
+	from Nicola Iarocci's answer [here](http://stackoverflow.com/a/23708110).
 	"""
-	def _validate_allows_duplicates(self, duplicates, field, value):
+	def _validate_empty(self, empty, field, value):
+		super()._validate_empty(empty, field, value)
+
+		if isinstance(field, list) and not empty and len(value) == 0:
+			self._error(field, "list cannot be empty")
+
+	def _validate_allows_duplicates(self, allows_duplicates, field, value):
+		if not isinstance(value, list):
+			self._error(field, "Value must be a list.")
+			return False
+
+		if not allows_duplicates and len(set(value)) != len(value):
+			self._error(field, "Field contains duplicates.")
+			return False
+
 		return True
 
 	"""
