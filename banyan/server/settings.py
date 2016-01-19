@@ -39,9 +39,9 @@ We don't enable caching by default, since information about tasks is likely to
 become out-of-date quickly.
 """
 
-max_task_list_length = 32768
+max_task_list_length = 1024
 max_name_string_length = 256
-max_command_string_length = 32768
+max_command_string_length = 1024
 
 memory_regex = r'^(0|[1-9][0-9]*) (byte|bytes|KiB|MiB|GiB|TiB)'
 max_memory_string_length = 32
@@ -50,10 +50,8 @@ time_regex = r'[1-9][0-9]*(.[0-9]*)? (second|minute|hour)s?'
 max_time_string_length = 32
 
 """
-☠ ☠ ☠
-Don't use multiline strings to write comments inside of dicts, because the
+XXX: Don't use multiline strings to write comments inside of dicts, because the
 strings will be prepended to the keys!
-☠ ☠ ☠
 """
 
 """
