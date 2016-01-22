@@ -9,7 +9,7 @@ import sys
 import socket
 from eve import Eve
 
-#import virtual_resources
+from virtual_resources import blueprints
 from validation import Validator
 from event_hooks import EventHooks
 
@@ -27,5 +27,6 @@ if __name__ == '__main__':
 	"""
 	with app.app_context():
 		hooks = EventHooks()
-		#app.register_blueprint(virtual_resources.blueprint)
+		for blueprint in blueprints:
+			app.register_blueprint(blueprint)
 		app.run(host=get_ip(), port=5000)
