@@ -79,15 +79,18 @@ it.
 - `db`: Handle to the `banyan` database.
 """
 def release_keep_inactive(child_id, db):
-	query = {config.ID_FIELD: child_id}
-	child = db.tasks.find_one(query)
+	targets = [child_id] if isinstance(child_id, ObjectId) else child_id
+	query = {config.ID_FIELD: {'$in': targets}}
+	cursor = db.tasks.find(query)
 
-	assert child['state'] == 'inactive'
-	assert child['pending_dependency_count'] >= 1
+	assert cursor.count() == len(targets)
+
+	for child in db.tasks.find(query):
+		assert child['state'] == 'inactive'
+		assert child['pending_dependency_count'] >= 1
 	
-	update_by_id(child_id, db,
-		{
-			'$dec': {'pending_dependency_count': 1},
+	update_by_id(child_id, db, {
+			'$inc': {'pending_dependency_count': -1},
 			'$currentDate': {config.LAST_UPDATED: True}
 		}
 	)
@@ -131,8 +134,10 @@ def process_additions(updates, db):
 		for parent in update['targets']:
 			cur = find_by_id(parent, db, ['continuations'])['continuations']
 			new = list(set(update['values']) - set(cur))
-			update_by_id(parent, db, {'$push': {'continuations': {'$each': new}}})
-			acquire(new, db)
+
+			if len(new) != 0:
+				update_by_id(parent, db, {'$push': {'continuations': {'$each': new}}})
+				acquire(new, db)
 
 """
 Called after validation in order to perform bulk removal of continuations. Note
@@ -146,9 +151,18 @@ If validation was successful, this operation should not fail. However, the
 implementation is not atomic.
 """
 def process_removals(updates, db):
+	print("UPDATES:")
+	print(updates)
+
 	for update in updates:
 		for parent in update['targets']:
 			cur = find_by_id(parent, db, ['continuations'])['continuations']
-			removed = list(set(update['values']) & set(cur))
-			update_by_id(parent, db, {'$pull': {'continuations': {'$in': removed}}})
-			release_keep_inactive(removed, db)
+			rm = list(set(update['values']) & set(cur))
+			print("REMOVED:")
+			print(rm)
+			print(cur)
+			print(update['values'])
+
+			if len(rm) != 0:
+				update_by_id(parent, db, {'$pull': {'continuations': {'$in': rm}}})
+				release_keep_inactive(rm, db)
