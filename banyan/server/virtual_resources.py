@@ -5,7 +5,7 @@ Sets up virtual resources based on the schema defined in `virtual_schema.py`.
 """
 
 from werkzeug import exceptions
-from flask import Blueprint, jsonify, current_app as app
+from flask import Blueprint, abort, jsonify, make_response, current_app as app
 
 from eve.utils import *
 from eve.validation import ValidationError
@@ -17,7 +17,6 @@ from validation import Validator
 
 def validate_updates(updates, schema, valid_func=None):
 	if not isinstance(updates, list):
-		print(updates)
 		return updates, {'input': "Updates string must be a JSON array."}
 
 	if len(updates) > max_update_list_length:
@@ -140,13 +139,18 @@ def make_resource_level_handler(parent_resource, virtual_resource, schema, updat
 				format(e)))
 
 		response = {}
+
 		if len(issues) != 0:
 			response[config.ISSUES] = issues
 			response[config.STATUS] = config.STATUS_ERR
+			status = config.VALIDATION_ERROR_STATUS
 		else:
 			response[config.STATUS] = config.STATUS_OK
+			status = 200
 
-		return jsonify(response)
+		response = jsonify(response)
+		response.status_code = status
+		return response
 
 	return handler
 
@@ -171,7 +175,7 @@ blueprints = []
 def route(p_res, v_res, schema):
 	update_schema = schema['schema']
 	u_func = schema['update_func']
-	v_func = schema.get('valid_func')
+	v_func = schema.get('validate_func')
 
 	schema['handlers'] = {}
 	router = Blueprint(p_res + '/' + v_res, __name__)

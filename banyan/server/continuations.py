@@ -151,17 +151,10 @@ If validation was successful, this operation should not fail. However, the
 implementation is not atomic.
 """
 def process_removals(updates, db):
-	print("UPDATES:")
-	print(updates)
-
 	for update in updates:
 		for parent in update['targets']:
 			cur = find_by_id(parent, db, ['continuations'])['continuations']
 			rm = list(set(update['values']) & set(cur))
-			print("REMOVED:")
-			print(rm)
-			print(cur)
-			print(update['values'])
 
 			if len(rm) != 0:
 				update_by_id(parent, db, {'$pull': {'continuations': {'$in': rm}}})
