@@ -5,7 +5,7 @@ Configuration settings for the server.
 """
 
 import os
-from physical_schema import tasks
+from physical_schema import tasks, memory_usage, cpu_usage, gpu_usage
 
 # XXX: remove after testing.
 DEBUG = True
@@ -40,4 +40,9 @@ We don't enable caching by default, since information about tasks is likely to
 become out-of-date quickly.
 """
 
-DOMAIN = {'tasks': tasks}
+DOMAIN = {
+	'tasks': tasks,
+	'memory_usage': memory_usage,
+	'cpu_usage': cpu_usage,
+	'gpu_usage': gpu_usage
+}

@@ -18,7 +18,9 @@ different for each virtual resource.
 """
 
 from constants import *
+from physical_schema import execution_info
 import continuations
+import execution_history
 
 """
 XXX: Don't use multiline strings to write comments inside of dicts, because the
@@ -86,6 +88,12 @@ virtual_resources = {
 					}
 				}
 			}
+		},
+
+		'add_execution_history': {
+			'granularity': ['item'],
+			'update_func': execution_history.process_addition,
+			'value_schema': execution_info
 		}
 	}
 }

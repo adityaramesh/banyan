@@ -164,7 +164,6 @@ def make_item_level_handler(parent_resource, virtual_resource, schema, update_fu
 
 	def scaffold(target_id, values):
 		assert isinstance(target_id, str)
-		assert isinstance(values, list)
 		return handler([{'targets': [target_id], 'values': values}])
 
 	return scaffold

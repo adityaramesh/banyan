@@ -22,11 +22,13 @@ resource_info = {
 		'maxlength': max_memory_string_length,
 		'required': True
 	},
+
 	'cores': {
 		'type': 'integer',
 		'min': 1,
 		'default': 1
 	},
+
 	'gpus': {
 		'type': 'list',
 		'schema': {
@@ -50,90 +52,18 @@ resource_info = {
 	}
 }
 
-
-"""
-Stores all information associated with a worker's attempt to complete a task.
-"""
 execution_info = {
 	'type': 'dict',
-
 	'schema': {
 		'worker': {
 			'type': 'string',
-			'maxlength': max_name_string_length
+			'maxlength': max_name_string_length,
+			'required': True
 		},
+
 		'exit_status': {'type': 'integer'},
 		'time_started': {'type': 'datetime'},
-		'time_terminated': {'type': 'datetime'},
-
-		'memory_usage': {
-			'type': 'list',
-			'schema': {
-				'type': 'dict',
-				'schema': {
-					'time': {
-						'type': 'datetime',
-						'required': True
-					},
-					'resident_memory_bytes': {
-						'type': 'integer',
-						'min': 0,
-						'required': True
-					}
-				}
-			}
-		},
-		'cpu_utilization': {
-			'type': 'list',
-			'schema': {
-				'type': 'dict',
-				'schema': {
-					'time': {
-						'type': 'datetime',
-						'required': True
-					},
-					'core': {
-						'type': 'integer',
-						'min': 0,
-						'required': True
-					},
-					'utilization_ratio': {
-						'type': 'float',
-						'min': 0,
-						'max': 1,
-						'required': True
-					}
-				}
-			}
-		},
-		'gpu_usage': {
-			'type': 'list',
-			'schema': {
-				'type': 'dict',
-				'schema': {
-					'time': {
-						'type': 'datetime',
-						'required': True
-					},
-					'gpu': {
-						'type': 'integer',
-						'min': 0,
-						'required': True
-					},
-					'resident_memory_bytes': {
-						'type': 'integer',
-						'min': 0,
-						'required': True
-					},
-					'utilization_ratio': {
-						'type': 'float',
-						'min': 0,
-						'max': 1,
-						'required': True
-					}
-				}
-			}
-		}
+		'time_terminated': {'type': 'datetime'}
 	}
 }
 
@@ -252,6 +182,7 @@ tasks = {
 		'max_retry_count': {
 			'type': 'integer',
 			'min': 0,
+			'max': max_supported_retry_count,
 			'default': 0,
 			'dependencies': ['command'],
 			'mutable_iff_inactive': True
@@ -279,24 +210,103 @@ tasks = {
 			'readonly': True
 		},
 
-		# Since `max_retry_count` may be set to a positive value, a task
-		# may be executed more than once. Rather than wiping out the
-		# prior execution history of a task each time it is rerun, we
-		# append another instance of `execution_info` to the `history`
-		# list. This provides the user with more information about why a
-		# task may have failed.
-		#
-		# This field is set to `readonly`, because workers do not write
-		# updates to it directly. A worker should not have to be aware
-		# of the current execution history of a task in order to append
-		# more information to it. This level of abstraction is
-		# implemented by having the worker post updates to a virtual
-		# subresource of `tasks` that models the structure of
-		# `execution_info`.
-		'history': {
+		# Contains information about workers' attempts to run this task.
+		'execution_history': {
 			'type': 'list',
 			'readonly': True,
+			'maxlength': max_supported_retry_count,
 			'schema': execution_info
+		}
+	}
+}
+
+"""
+We don't need to store the retry attempt associated with each entry below; the entries associated
+with a given retry attempt can be determined automatically using the start and termination times.
+"""
+
+memory_usage = {
+	'schema': {
+		'task': {
+			'type': 'objectid',
+			'data_relation': {'resource': 'tasks'}
+		},
+
+		'time': {
+			'type': 'datetime',
+			'required': True
+		},
+
+		'resident_memory_bytes': {
+			'type': 'integer',
+			'min': 0,
+			'required': True
+		}
+	}
+}
+
+cpu_usage = {
+	'schema': {
+		'task': {
+			'type': 'objectid',
+			'data_relation': {'resource': 'tasks'}
+		},
+
+		'time': {
+			'type': 'datetime',
+			'required': True
+		},
+
+		'usage': {
+			'type': 'list',
+			'empty': False,
+			'schema': {
+				'core': {
+					'type': 'integer',
+					'min': 0,
+					'required': True
+				},
+
+				'utilization_ratio': {
+					'type': 'float',
+					'min': 0,
+					'max': 1,
+					'required': True
+				}
+			}
+		}
+	}
+}
+
+gpu_usage = {
+	'schema': {
+		'task': {
+			'type': 'objectid',
+			'data_relation': {'resource': 'tasks'}
+		},
+
+		'time': {
+			'type': 'datetime',
+			'required': True
+		},
+
+		'gpu': {
+			'type': 'integer',
+			'min': 0,
+			'required': True
+		},
+
+		'resident_memory_bytes': {
+			'type': 'integer',
+			'min': 0,
+			'required': True
+		},
+
+		'utilization_ratio': {
+			'type': 'float',
+			'min': 0,
+			'max': 1,
+			'required': True
 		}
 	}
 }
