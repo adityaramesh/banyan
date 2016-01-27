@@ -186,15 +186,14 @@ when various prerequisites are fulfilled.
 
 ### Inactive to Available
 
-- Assert that the task is `inactive`, and that its dependency count is zero.
-- Set the state to `available`.
-- For each continuation `c`, call `release_continuation(c)`.
+- Nothing special.
 
 ### Available to Running
 
 - The server fulfills a request from a worker to claim a task.
 - Run the steps described in the section on work-stealing; nothing more has to
   be done. 
+- Increment `retry_count`.
 
 ### Available to Cancelled
 
@@ -215,7 +214,6 @@ when various prerequisites are fulfilled.
   - If `retry_count` is less than `max_retry_count`:
     - Record the changes to `execution_info`.
     - Append a new `execution_info` object to the `history` list.
-    - Increment `retry_count`.
     - Set the state to `available`.
   - Else, call `cancel_continuations(self)`.
 - Else, call `release_continuations(self)`.
@@ -237,7 +235,7 @@ when various prerequisites are fulfilled.
 
 ### Pending Cancellation to Cancelled
 
-- In this case, the server receives a request from the client to change the
+- In this case, the server receives a request from the worker to change the
   status of the task to `cancelled` when the current state of the task is
   `pending_cancellation`.
 - Run the steps described in the section on cancellation above; nothing more
