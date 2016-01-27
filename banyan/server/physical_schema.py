@@ -70,6 +70,8 @@ execution_info = {
 
 tasks = {
 	'item_title': 'task',
+	'resource_methods': ['GET', 'POST'],
+	'item_methods': ['GET', 'PATCH'],
 	'authentication': RestrictCreationToUsers,
 	'allowed_read_roles': ['user', 'worker'],
 	'allowed_write_roles': ['user', 'worker'],
@@ -231,6 +233,8 @@ with a given retry attempt can be determined automatically using the start and t
 
 memory_usage = {
 	'authentication': TokenAuth,
+	'resource_methods': ['GET', 'POST'],
+	'item_methods': ['GET'],
 	'allowed_read_roles': ['user', 'worker'],
 	'allowed_write_roles': ['worker'],
 
@@ -255,6 +259,8 @@ memory_usage = {
 
 cpu_usage = {
 	'authentication': TokenAuth,
+	'resource_methods': ['GET', 'POST'],
+	'item_methods': ['GET'],
 	'allowed_read_roles': ['user', 'worker'],
 	'allowed_write_roles': ['worker'],
 
@@ -292,6 +298,8 @@ cpu_usage = {
 
 gpu_usage = {
 	'authentication': TokenAuth,
+	'resource_methods': ['GET', 'POST'],
+	'item_methods': ['GET'],
 	'allowed_read_roles': ['user', 'worker'],
 	'allowed_write_roles': ['worker'],
 

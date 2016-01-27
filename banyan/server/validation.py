@@ -11,7 +11,7 @@ from eve.io.mongo import Validator
 See `notes/specification.md` for more information about state transitions.
 """
 
-LEGAL_USER_STATE_TRANSITIONS = {
+legal_user_state_transitions = {
 	'inactive':             [ 'inactive', 'available', 'cancelled'],
 	'available':            [ 'available', 'cancelled'],
 	'running':              [ 'running', 'cancelled'],
@@ -20,7 +20,7 @@ LEGAL_USER_STATE_TRANSITIONS = {
 	'terminated':           [ 'terminated']
 }
 
-LEGAL_WORKER_STATE_TRANSITIONS = {
+legal_worker_state_transitions = {
 	'inactive':             [ 'inactive'],
 	'available':            [ 'available', 'running'],
 	'running':              [ 'running', 'terminated'],
@@ -106,10 +106,8 @@ class Validator(Validator):
 			si = original_document['state']
 			sf = document['state']
 
-			# TODO: incorporate legal_worker_transitions once
-			# workers can be authenticated. but test this later in
-			# test_worker.py.
-			if sf not in LEGAL_USER_STATE_TRANSITIONS[si]:
+			if sf not in legal_user_state_transitions[si] and sf not in \
+				legal_worker_state_transitions[si]:
 				self._error('state', "Illegal state transition from '{}' to '{}'.". \
 					format(si, sf))
 				return False

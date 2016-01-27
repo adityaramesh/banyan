@@ -23,19 +23,6 @@ IF_MATCH = False
 HATEOAS  = False
 
 """
-We only allow the user to query information about tasks, or to create new ones.
-Deletion is disallowed, because the history of a task should be preserved even
-after it is retired.
-"""
-RESOURCE_METHODS = ['GET', 'POST']
-
-"""
-Deletion (via DELETE) and replacement (via PUT) of tasks are disallowed for the
-same reasons given above.
-"""
-ITEM_METHODS = ['GET', 'PATCH']
-
-"""
 We don't enable caching by default, since information about tasks is likely to
 become out-of-date quickly.
 """
