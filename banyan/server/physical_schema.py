@@ -5,6 +5,7 @@ Schema definitions for physical resources.
 """
 
 from constants import *
+from authentication import ValidateToken, RestrictWriteAccess
 
 """
 XXX: Don't use multiline strings to write comments inside of dicts, because the
@@ -69,6 +70,7 @@ execution_info = {
 
 tasks = {
 	'item_title': 'task',
+	'authentication': ValidateToken,
 
 	'schema': {
 		# Information provided by the client.
@@ -226,6 +228,9 @@ with a given retry attempt can be determined automatically using the start and t
 """
 
 memory_usage = {
+	'authentication': RestrictWriteAccess,
+	'allowed_roles': ['worker'],
+
 	'schema': {
 		'task': {
 			'type': 'objectid',
@@ -246,6 +251,9 @@ memory_usage = {
 }
 
 cpu_usage = {
+	'authentication': RestrictWriteAccess,
+	'allowed_roles': ['worker'],
+
 	'schema': {
 		'task': {
 			'type': 'objectid',
@@ -279,6 +287,9 @@ cpu_usage = {
 }
 
 gpu_usage = {
+	'authentication': RestrictWriteAccess,
+	'allowed_roles': ['worker'],
+
 	'schema': {
 		'task': {
 			'type': 'objectid',
