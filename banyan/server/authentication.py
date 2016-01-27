@@ -14,8 +14,6 @@ class TokenAuth(TokenAuth):
 		db = app.data.driver.db
 		res = db.users.find_one({'token': token}, {'role': True})
 
-		if not res:
-			return False
-		if method in ['POST', 'PUT', 'PATCH', 'DELETE'] and res['role'] not in allowed_roles:
+		if not res or res['role'] not in allowed_roles:
 			return False
 		return True
