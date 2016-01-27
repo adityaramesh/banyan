@@ -5,7 +5,7 @@ Schema definitions for physical resources.
 """
 
 from constants import *
-from authentication import TokenAuth
+from authentication import TokenAuth, RestrictCreationToUsers
 
 """
 XXX: Don't use multiline strings to write comments inside of dicts, because the
@@ -70,7 +70,7 @@ execution_info = {
 
 tasks = {
 	'item_title': 'task',
-	'authentication': TokenAuth,
+	'authentication': RestrictCreationToUsers,
 	'allowed_read_roles': ['user', 'worker'],
 	'allowed_write_roles': ['user', 'worker'],
 
