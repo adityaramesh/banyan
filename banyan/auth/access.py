@@ -16,12 +16,12 @@ import sys
 
 """
 We can't just use `os.urandom` to generate a UUID to use as the token, because the token must be
-embedded in the `Authentication` header of the HTTP request. Eve automatically validtes the contents
-of this header, parses its contents, and passes the token to us in the `check_auth` function. In
-this process, the raw bytes in the header are decoded using UTF-8. The mapping between UTF-8 and
-binary is not one-to-one, so this is a lossy process. In general, printing out the base-64 encoded
-contents of the parsed header will give us a different result from the original base-64 encoded
-UUID.
+embedded in the `Authentication` header of the HTTP request. Flask automatically validtes the
+contents of this header, parses its contents, and passes the token to us in the `check_auth`
+function. In this process, the raw bytes in the header are decoded using UTF-8. The mapping between
+UTF-8 and binary is not one-to-one, so this is a lossy process. In general, printing out the base-64
+encoded contents of the parsed header will give us a different result from the original base-64
+encoded UUID.
 
 To avoid this problem, we instead generate a random alphanumeric string to use as the token. The
 implementation here is based on the one given by Ignacio Vazquez-Abrams [here][rand_str_gen].
