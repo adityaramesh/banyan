@@ -53,21 +53,6 @@ resource_info = {
 	}
 }
 
-execution_info = {
-	'type': 'dict',
-	'schema': {
-		'worker': {
-			'type': 'string',
-			'maxlength': max_name_string_length,
-			'required': True
-		},
-
-		'exit_status': {'type': 'integer'},
-		'time_started': {'type': 'datetime'},
-		'time_terminated': {'type': 'datetime'}
-	}
-}
-
 tasks = {
 	'item_title': 'task',
 	'resource_methods': ['GET', 'POST'],
@@ -214,14 +199,6 @@ tasks = {
 			'min': 0,
 			'default': 0,
 			'readonly': True
-		},
-
-		# Contains information about workers' attempts to run this task.
-		'execution_history': {
-			'type': 'list',
-			'readonly': True,
-			'maxlength': max_supported_retry_count,
-			'schema': execution_info
 		}
 	}
 }
@@ -332,5 +309,36 @@ gpu_usage = {
 			'max': 1,
 			'required': True
 		}
+	}
+}
+
+execution_info = {
+	'authentication': TokenAuth,
+	'resource_methods': ['GET', 'POST'],
+	'item_methods': ['GET', 'PATCH'],
+	'allowed_read_roles': ['user', 'worker'],
+	'allowed_write_roles': ['worker'],
+
+	'schema': {
+		'task': {
+			'type': 'objectid',
+			'data_relation': {'resource': 'tasks'}
+		},
+
+		'retry_count': {
+			'type': 'integer',
+			'min': 0,
+			'max': max_supported_retry_count
+		},
+
+		'worker': {
+			'type': 'string',
+			'maxlength': max_name_string_length,
+			'required': True
+		},
+
+		'exit_status': {'type': 'integer'},
+		'time_started': {'type': 'datetime'},
+		'time_terminated': {'type': 'datetime'}
 	}
 }
