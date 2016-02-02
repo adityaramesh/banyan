@@ -33,6 +33,7 @@ We also put a cap on the maximum number of times a task can be retried, so that 
 history list has an upper bound in size.
 """
 max_supported_retry_count = 32
+default_max_retry_count = 1
 
 memory_regex = r'^(0|[1-9][0-9]*) (byte|bytes|KiB|MiB|GiB|TiB)'
 max_memory_string_length = 32

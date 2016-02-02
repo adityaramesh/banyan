@@ -200,7 +200,7 @@ tasks = {
 			'type': 'integer',
 			'min': 0,
 			'max': max_supported_retry_count,
-			'default': 0,
+			'default': default_max_retry_count,
 			'dependencies': ['command'],
 			'mutable_iff_inactive': True
 		},
