@@ -12,7 +12,7 @@ See `notes/specification.md` for more information about state transitions.
 """
 
 legal_user_state_transitions = {
-	'inactive':             ['available', 'cancelled'],
+	'inactive':             ['cancelled', 'available'],
 
 	# Note: when a user attempts to change the state of a task to `cancelled`, the server first
 	# puts the task in the `pending_cancellation` state, and then goes through the procedures
@@ -29,6 +29,28 @@ legal_worker_state_transitions = {
 	'inactive':             [],
 	'available':            ['running'],
 	'running':              ['terminated'],
+	'pending_cancellation': ['cancelled', 'terminated'],
+	'cancelled':            [],
+	'terminated':           []
+}
+
+"""
+Note: this dictionary is **not** the union of the two dictionaries above. The dictionaries above
+describe the transitions that an API user is allowed to make. But a state transition requested by a
+user may not necessarily result in the same transition actually being made by the server. For
+example, when the user cancels a task while it is running, the task is actually put in the
+'pending_cancellation' state.
+
+The dictionary below describes the permissible transitions that the *server* is allowed to make. By
+the time the validator is applied to an update, the state transition requested by the user is
+converted into the actual transition that the server must make (see `event_hooks.py` for details).
+This dictionary is used to verify transitions of the latter kind, i.e. the transitions that are
+actually applied to the documents in the database.
+"""
+legal_state_transitions = {
+	'inactive':             ['cancelled', 'available'],
+	'available':            ['cancelled', 'running'],
+	'running':              ['pending_cancellation', 'terminated'],
 	'pending_cancellation': ['cancelled', 'terminated'],
 	'cancelled':            [],
 	'terminated':           []
@@ -111,8 +133,7 @@ class Validator(Validator):
 			si = original_document['state']
 			sf = document['state']
 
-			if sf not in legal_user_state_transitions[si] and sf not in \
-				legal_worker_state_transitions[si]:
+			if sf not in legal_state_transitions[si]:
 				self._error('state', "Illegal state transition from '{}' to '{}'.". \
 					format(si, sf))
 				return False
