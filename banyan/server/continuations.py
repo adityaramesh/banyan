@@ -27,8 +27,10 @@ continuations.
 - `db`: Handle to the `banyan` database.
 """
 def release(child_id, db):
-	query = {config.ID_FIELD: child_id}
-	child = db.tasks.find_one(query)
+	child = find_by_id('tasks', child_id, db, {
+		'state': True,
+		'pending_dependency_count': True
+	})
 
 	assert child['state'] == 'inactive'
 	assert child['pending_dependency_count'] >= 1
@@ -58,13 +60,12 @@ it.
 - `db`: Handle to the `banyan` database.
 """
 def release_keep_inactive(child_id, db):
-	targets = [child_id] if isinstance(child_id, ObjectId) else child_id
-	query = {config.ID_FIELD: {'$in': targets}}
-	cursor = db.tasks.find(query)
+	cursor = find_by_id('tasks', child_id, db, {
+		'state': True,
+		'pending_dependency_count': True
+	})
 
-	assert cursor.count() == len(targets)
-
-	for child in db.tasks.find(query):
+	for child in cursor:
 		assert child['state'] == 'inactive'
 		assert child['pending_dependency_count'] >= 1
 	
@@ -83,12 +84,26 @@ the dependency counts).
 - `db`: Handle to the `banyan` database.
 """
 def try_make_available(child_id, db):
-	query = {config.ID_FIELD: child_id}
-	child = db.tasks.find_one(query)
+	child = find_by_id('tasks', child_id, db, {
+		'state': True,
+		'pending_dependency_count': True
+	})
+
 	assert child['state'] == 'inactive'
 
 	if child['pending_dependency_count'] == 0:
 		update_by_id('tasks', child_id, db, {'$set': {'state': 'available'}})
+
+"""
+Cancels a task, along with all of its continuations.
+
+Parameters:
+- `task_id`: Id of the task to be cancelled.
+- `db`: Handle to the `banyan` database.
+"""
+def cancel(task_id, db):
+	# TODO
+	pass
 
 """
 Called when bulk addition of continuations is performed. Checks to ensure that
