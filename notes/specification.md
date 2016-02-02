@@ -163,7 +163,6 @@ when various prerequisites are fulfilled.
   to do.
 
 - Allowable state changes:
-  - Any state to itself
   - Inactive to:
     - Available
     - Cancelled

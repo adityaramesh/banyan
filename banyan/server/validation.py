@@ -12,21 +12,21 @@ See `notes/specification.md` for more information about state transitions.
 """
 
 legal_user_state_transitions = {
-	'inactive':             ['inactive', 'available', 'cancelled'],
-	'available':            ['available', 'cancelled'],
-	'running':              ['running', 'cancelled'],
+	'inactive':             ['available', 'cancelled'],
+	'available':            ['cancelled'],
+	'running':              ['cancelled'],
 	'pending_cancellation': ['pending_cancellation'],
-	'cancelled':            ['cancelled'],
-	'terminated':           ['terminated']
+	'cancelled':            [],
+	'terminated':           []
 }
 
 legal_worker_state_transitions = {
-	'inactive':             ['inactive'],
-	'available':            ['available', 'running'],
-	'running':              ['running', 'terminated'],
-	'pending_cancellation': ['pending_cancellation', 'cancelled', 'terminated'],
-	'cancelled':            ['cancelled'],
-	'terminated':           ['terminated']
+	'inactive':             [],
+	'available':            ['running'],
+	'running':              ['terminated'],
+	'pending_cancellation': ['cancelled', 'terminated'],
+	'cancelled':            [],
+	'terminated':           []
 }
 
 class Validator(Validator):
