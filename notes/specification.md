@@ -194,6 +194,7 @@ when various prerequisites are fulfilled.
 - Run the steps described in the section on work-stealing; nothing more has to
   be done. 
 - Increment `retry_count`.
+- Insert a new `execution_data` document into the `execution_history` database.
 
 ### Available to Cancelled
 
