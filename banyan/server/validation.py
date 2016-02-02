@@ -13,9 +13,14 @@ See `notes/specification.md` for more information about state transitions.
 
 legal_user_state_transitions = {
 	'inactive':             ['available', 'cancelled'],
+
+	# Note: when a user attempts to change the state of a task to `cancelled`, the server first
+	# puts the task in the `pending_cancellation` state, and then goes through the procedures
+	# described in the specification.
 	'available':            ['cancelled'],
 	'running':              ['cancelled'],
-	'pending_cancellation': ['pending_cancellation'],
+
+	'pending_cancellation': [],
 	'cancelled':            [],
 	'terminated':           []
 }
