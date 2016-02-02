@@ -15,7 +15,7 @@ from constants import *
 from virtual_schema import virtual_resources
 from validation import Validator
 
-def validate_updates(updates, schema, valid_func=None):
+def validate_updates(updates, schema, original_doc_func=None, valid_func=None):
 	if not isinstance(updates, list):
 		return updates, {'input': "Updates string must be a JSON array."}
 
@@ -61,9 +61,18 @@ def validate_updates(updates, schema, valid_func=None):
 		def log_issue(msg):
 			issues['update {}: validator errors'.format(i)] = msg
 
-		if not validator.validate(revised_update):
-			log_issue(str(validator.errors))
-			continue
+		if not original_doc_func:
+			if not validator.validate(revised_update):
+				log_issue(str(validator.errors))
+				continue
+		else:
+			orig_id, orig_doc = original_doc_func(revised_update, log_issue)
+
+			if not orig_id:
+				continue
+			if not validator.validate_update(revised_update, orig_id, orig_doc):
+				log_issue(str(validator.errors))
+				continue
 
 		if valid_func:
 			valid_func(revised_update, log_issue)
@@ -81,13 +90,14 @@ Parameters:
   update schema.
 """
 def make_resource_level_handler(parent_resource, virtual_resource, schema, update_func, \
-	valid_func=None):
+	original_doc_func=None, valid_func=None):
 
 	def handler(payload):
 		issues = {}
 		
 		try:
-			updates, errors = validate_updates(payload, schema, valid_func)
+			updates, errors = validate_updates(payload, schema, original_doc_func, \
+				valid_func)
 
 			if not errors:
 				"""
@@ -158,9 +168,11 @@ def make_resource_level_handler(parent_resource, virtual_resource, schema, updat
 Same as `make_resource_level_handler`, but for virtual resources that work at item-level
 granularity.
 """
-def make_item_level_handler(parent_resource, virtual_resource, schema, update_func, valid_func=None):
+def make_item_level_handler(parent_resource, virtual_resource, schema, update_func, \
+	original_doc_func=None, valid_func=None):
+
 	handler = make_resource_level_handler(parent_resource, virtual_resource, schema, update_func,
-		valid_func)
+		original_doc_func, valid_func)
 
 	def scaffold(target_id, values):
 		assert isinstance(target_id, str)
@@ -174,6 +186,7 @@ blueprints = []
 def route(p_res, v_res, schema):
 	update_schema = schema['schema']
 	u_func = schema['update_func']
+	od_func = schema.get('original_doc_func')
 	v_func = schema.get('validate_func')
 
 	schema['handlers'] = {}
@@ -181,7 +194,8 @@ def route(p_res, v_res, schema):
 	blueprints.append(router)
 
 	if 'resource' in schema['granularity']:
-		h1 = make_resource_level_handler(p_res, v_res, update_schema, u_func, v_func)
+		h1 = make_resource_level_handler(p_res, v_res, update_schema, u_func, od_func, \
+			v_func)
 		schema['handlers']['resource_level'] = h1
 
 		@router.route('/' + p_res + '/' + v_res, methods=['POST'])
@@ -189,7 +203,7 @@ def route(p_res, v_res, schema):
 			return h1(payload())
 
 	if 'item' in schema['granularity']:
-		h2 = make_item_level_handler(p_res, v_res, update_schema, u_func, v_func)
+		h2 = make_item_level_handler(p_res, v_res, update_schema, u_func, od_func, v_func)
 		schema['handlers']['item_level'] = h2
 
 		"""

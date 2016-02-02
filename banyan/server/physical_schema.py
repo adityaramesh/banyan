@@ -53,6 +53,32 @@ resource_info = {
 	}
 }
 
+execution_data = {
+	'task': {
+		'type': 'objectid',
+		'data_relation': {'resource': 'tasks'},
+		'readonly': True
+	},
+
+	# Note that the retry count must be a positive integer.
+	'retry_count': {
+		'type': 'integer',
+		'min': 1,
+		'max': max_supported_retry_count,
+		'readonly': True
+	},
+
+	'worker': {
+		'type': 'string',
+		'maxlength': max_name_string_length,
+		'createonly': True
+	},
+
+	'exit_status': {'type': 'integer', 'createonly': True},
+	'time_started': {'type': 'datetime', 'createonly': True},
+	'time_terminated': {'type': 'datetime', 'createonly': True}
+}
+
 tasks = {
 	'item_title': 'task',
 	'resource_methods': ['GET', 'POST'],
@@ -199,13 +225,23 @@ tasks = {
 			'min': 0,
 			'default': 0,
 			'readonly': True
+		},
+
+		# Id of the `execution_data` instance that describes the most recent attempt by a
+		# worker to run this task. This field is used by the server to implement the
+		# `update_execution_data` virtual resource.
+		'execution_data_id': {
+			'type': 'objectid',
+			'data_relation': {'resource': 'execution_info'},
+			'readonly': True
 		}
 	}
 }
 
 """
-We don't need to store the retry attempt associated with each entry below; the entries associated
-with a given retry attempt can be determined automatically using the start and termination times.
+We don't need to store the retry attempt associated with each usage entry below; the entries
+associated with a given retry attempt can be determined automatically using the start and
+termination times.
 """
 
 memory_usage = {
@@ -318,27 +354,5 @@ execution_info = {
 	'item_methods': ['GET', 'PATCH'],
 	'allowed_read_roles': ['user', 'worker'],
 	'allowed_write_roles': ['worker'],
-
-	'schema': {
-		'task': {
-			'type': 'objectid',
-			'data_relation': {'resource': 'tasks'}
-		},
-
-		'retry_count': {
-			'type': 'integer',
-			'min': 0,
-			'max': max_supported_retry_count
-		},
-
-		'worker': {
-			'type': 'string',
-			'maxlength': max_name_string_length,
-			'required': True
-		},
-
-		'exit_status': {'type': 'integer'},
-		'time_started': {'type': 'datetime'},
-		'time_terminated': {'type': 'datetime'}
-	}
+	'schema': execution_data
 }

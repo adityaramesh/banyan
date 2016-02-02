@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Defines the specifications necessary to implement the virtual resources.
+Defines the specifications necessary to implement virtual resources.
 
 When the user performs updates on a virtual resource that has resource-level granularity (e.g.
 `/tasks/add_continuations`), the payload of the update should have the following form:
@@ -18,9 +18,9 @@ different for each virtual resource.
 """
 
 from constants import *
-from physical_schema import execution_info
+from physical_schema import execution_data
 import continuations
-import execution_history
+import execution_data as execution_data_
 
 """
 XXX: Don't use multiline strings to write comments inside of dicts, because the
@@ -90,10 +90,20 @@ virtual_resources = {
 			}
 		},
 
-		'add_execution_history': {
+		'update_execution_data': {
 			'granularity': ['item'],
-			'update_func': execution_history.process_addition,
-			'value_schema': execution_info
+
+			# If defined, it is implied that this virtual resource is used to perform
+			# **updates**, and not additions or removals. This means that internally,
+			# the `validate_update` function of `Validator` is used in place of
+			# `validate`. Since the former requires the id and value of the original
+			# document, we need to define a function that returns this information.
+			'original_doc_func': execution_data_.get_target,
+			'update_func': execution_data_.process_update,
+			'value_schema': {
+				'type': 'dict',
+				'schema': execution_data
+			}
 		}
 	}
 }

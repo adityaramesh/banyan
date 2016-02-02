@@ -12,21 +12,21 @@ See `notes/specification.md` for more information about state transitions.
 """
 
 legal_user_state_transitions = {
-	'inactive':             [ 'inactive', 'available', 'cancelled'],
-	'available':            [ 'available', 'cancelled'],
-	'running':              [ 'running', 'cancelled'],
-	'pending_cancellation': [ 'pending_cancellation'],
-	'cancelled':            [ 'cancelled'],
-	'terminated':           [ 'terminated']
+	'inactive':             ['inactive', 'available', 'cancelled'],
+	'available':            ['available', 'cancelled'],
+	'running':              ['running', 'cancelled'],
+	'pending_cancellation': ['pending_cancellation'],
+	'cancelled':            ['cancelled'],
+	'terminated':           ['terminated']
 }
 
 legal_worker_state_transitions = {
-	'inactive':             [ 'inactive'],
-	'available':            [ 'available', 'running'],
-	'running':              [ 'running', 'terminated'],
-	'pending_cancellation': [ 'pending_cancellation', 'cancelled', 'terminated'],
-	'cancelled':            [ 'cancelled'],
-	'terminated':           [ 'terminated']
+	'inactive':             ['inactive'],
+	'available':            ['available', 'running'],
+	'running':              ['running', 'terminated'],
+	'pending_cancellation': ['pending_cancellation', 'cancelled', 'terminated'],
+	'cancelled':            ['cancelled'],
+	'terminated':           ['terminated']
 }
 
 class Validator(Validator):
@@ -141,9 +141,23 @@ class Validator(Validator):
 		return True
 
 	"""
-	In the schema defined in `settings.py`, a field that is marked
-	`mutable_iff_inactive` may only be initialized while the task is still
-	in the `inactive` state. This function enforces this.
+	In the schema defined in `settings.py`, a field that is marked `createonly_iff_inactive` may
+	only be initialized if no value is already associated with it for the given document.
+	"""
+	def _validate_createonly(self, createonly, field, value):
+		if not createonly or not self._original_document:
+			return True
+
+		if field in self._original_document:
+			self._error(field, "Cannot modify field '{}' once it has been set.". \
+				format(field))
+			return False
+
+		return True
+
+	"""
+	Like `createonly`, but with the additional restriction that the task must also be in the
+	`inactive` state in order for the field to be set.
 	"""
 	def _validate_creatable_iff_inactive(self, createonly, field, value):
 		if not createonly or not self._original_document:
@@ -154,12 +168,7 @@ class Validator(Validator):
 				"'inactive' state.".format(field))
 			return False
 		
-		if field in self._original_document:
-			self._error(field, "Cannot modify field '{}' once it has been set.". \
-				format(field))
-			return False
-
-		return True
+		return self._validate_createonly(createonly, field, value)
 
 	"""
 	In the schema defined in `settings.py`, a field that is marked

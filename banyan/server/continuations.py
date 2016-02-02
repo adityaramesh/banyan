@@ -15,7 +15,7 @@ it. Parameters:
 - `db`: Handle to the `banyan` database.
 """
 def acquire(child_id, db):
-	update_by_id(child_id, db, {
+	update_by_id('tasks', child_id, db, {
 		'$inc': {'pending_dependency_count': 1},
 		'$currentDate': {config.LAST_UPDATED: True}
 	})
@@ -34,7 +34,7 @@ def release(child_id, db):
 	assert child['pending_dependency_count'] >= 1
 	
 	if child['pending_dependency_count'] == 1:
-		update_by_id(child_id, db,
+		update_by_id('tasks', child_id, db,
 			{
 				'$set': {
 					'state': 'available',
@@ -44,7 +44,7 @@ def release(child_id, db):
 			}
 		)
 	else:
-		update_by_id(child_id, db,
+		update_by_id('tasks', child_id, db,
 			{
 				'$dec': {'pending_dependency_count': 1},
 				'$currentDate': {config.LAST_UPDATED: True}
@@ -68,7 +68,7 @@ def release_keep_inactive(child_id, db):
 		assert child['state'] == 'inactive'
 		assert child['pending_dependency_count'] >= 1
 	
-	update_by_id(child_id, db, {
+	update_by_id('tasks', child_id, db, {
 			'$inc': {'pending_dependency_count': -1},
 			'$currentDate': {config.LAST_UPDATED: True}
 		}
@@ -88,7 +88,7 @@ def try_make_available(child_id, db):
 	assert child['state'] == 'inactive'
 
 	if child['pending_dependency_count'] == 0:
-		update_by_id(child_id, db, {'$set': {'state': 'available'}})
+		update_by_id('tasks', child_id, db, {'$set': {'state': 'available'}})
 
 """
 Called when bulk addition of continuations is performed. Checks to ensure that
@@ -111,11 +111,12 @@ implementation is not atomic.
 def process_additions(updates, db):
 	for update in updates:
 		for parent in update['targets']:
-			cur = find_by_id(parent, db, ['continuations'])['continuations']
+			cur = find_by_id('tasks', parent, db, ['continuations'])['continuations']
 			new = list(set(update['values']) - set(cur))
 
 			if len(new) != 0:
-				update_by_id(parent, db, {'$push': {'continuations': {'$each': new}}})
+				update_by_id('tasks', parent, db, \
+					{'$push': {'continuations': {'$each': new}}})
 				acquire(new, db)
 
 """
@@ -132,9 +133,10 @@ implementation is not atomic.
 def process_removals(updates, db):
 	for update in updates:
 		for parent in update['targets']:
-			cur = find_by_id(parent, db, ['continuations'])['continuations']
+			cur = find_by_id('tasks', parent, db, ['continuations'])['continuations']
 			rm = list(set(update['values']) & set(cur))
 
 			if len(rm) != 0:
-				update_by_id(parent, db, {'$pull': {'continuations': {'$in': rm}}})
+				update_by_id('tasks', parent, db, \
+					{'$pull': {'continuations': {'$in': rm}}})
 				release_keep_inactive(rm, db)
