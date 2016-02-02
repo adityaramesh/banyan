@@ -95,15 +95,25 @@ def try_make_available(child_id, db):
 		update_by_id('tasks', child_id, db, {'$set': {'state': 'available'}})
 
 """
-Cancels a task, along with all of its continuations.
+Cancels a task, and recursively cancels all its continuations. Note that the dependency counts of
+the cancelled continuations will continue to be updated as other parent tasks terminate. But none of
+the dependency counts can ever reach zero.
 
 Parameters:
 - `task_id`: Id of the task to be cancelled.
 - `db`: Handle to the `banyan` database.
 """
-def cancel(task_id, db):
-	# TODO
-	pass
+def cancel(task_id, db, assert_inactive=False):
+	update_by_id('tasks', task_id, db, {'state': 'cancelled'})
+
+	if assert_inactive:
+		task = find_by_id('tasks', task_id, db, {'continuations': True})
+	else:
+		task = find_by_id('tasks', task_id, db, {'continuations': True, 'state': True})
+		assert task['state'] == 'inactive'
+
+	for child in task['continuations']:
+		cancel(child, db, assert_inactive=True)
 
 """
 Called when bulk addition of continuations is performed. Checks to ensure that
