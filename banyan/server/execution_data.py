@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 
 """
+banyan.server.execution_data
+----------------------------
+
 Utilities for updating the execution data associated with a task.
 """
 
@@ -8,37 +11,48 @@ from flask import current_app as app
 from eve.utils import config
 from mongo_common import find_by_id, update_by_id
 
-"""
-Used by `virtual_resources.py` to validate the data sent to `update_execution_data`. Returns the id
-and value of the `execution_data` instance that is currently associated with the target task.
-"""
-def get_target(update, log_issue):
-	# Ensure that `update_execution_data` is used only at the itme level.
-	assert len(update['targets']) == 1
-	assert isinstance(update['values'], dict)
+from validation import BulkUpdateValidator
 
-	db = app.data.driver.db
-	task_id = update['targets'][0]
-	task = find_by_id('tasks', task_id, db)
-	
-	assert task[config.ID_FIELD] == task_id
-	assert task != None
-	state = task['state']
+class ExecutionDataValidator(BulkUpdateValidator):
+	def __init__(self, schema, resource=None, allow_unknown=False, \
+		transparent_schema_rules=False):
 
-	if state in ['inactive', 'cancelled', 'terminated']:
-		log_issue("Cannot update execution data of task that is in '{}' state.".format(state))
-		return None, None
+		super().__init__(schema, resource)
 
-	assert 'execution_data_id' in task
-	target_id = task['execution_data_id']
-	target = find_by_id('execution_info', target_id, db)
-	return target_id, target
+	def validate_update(self, updates):
+		if not self.validate_update_format(updates):
+			return False
 
-"""
-Called after validation in order to append a new `execution_data` item to the execution history list
-of a task.
-"""
-def process_update(updates, db):
+		# Ensure that `update_execution_data` is used only at the item level.
+		assert len(updates['targets']) == 1
+		assert isinstance(updates['values'], dict)
+
+		db = app.data.driver.db
+		task_id = update['targets'][0]
+		task = find_by_id('tasks', task_id, db)
+		
+		assert task[config.ID_FIELD] == task_id
+		assert task != None
+		state = task['state']
+
+		if state in ['inactive', 'cancelled', 'terminated']:
+			self._error('target', "Cannot update execution data of task in '{}' state.". \
+				format(state))
+			return False
+
+		assert 'execution_data_id' in task
+		target_id = task['execution_data_id']
+		target = find_by_id('execution_info', target_id, db)
+
+		return super().validate_update_content(updates, original_ids=[target_id],
+			original_documents=[target])
+
+def make_update(updates, db):
+	"""
+	Called after validation in order to append a new ``execution_data`` item to the execution
+	history list of a task.
+	"""
+
 	assert len(updates) == 1
 	update = updates[0]
 

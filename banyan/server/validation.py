@@ -1,81 +1,57 @@
 # -*- coding: utf-8 -*-
 
 """
-Validator with additional constraints that are not covered by Eve.
+banyan.server.validation
+------------------------
+
+Defines custom validators for resource schema.
 """
 
 from flask import current_app as app
-from eve.io.mongo import Validator
+from eve.methods.common import serialize
+import eve.io.mongo
 
-"""
-See `notes/specification.md` for more information about state transitions.
-"""
+from state import legal_transitions
+from constants import *
 
-legal_user_state_transitions = {
-	'inactive':             ['cancelled', 'available'],
+class ValidatorBase(eve.io.mongo.Validator):
+	"""
+	Subclass of ``eve.io.mongo.Validator`` with support for the custom validation rules used by
+	Banyan. This validator should not be used directly, because it does not support virtual
+	resources. Use ``Validator`` instead.
 
-	# Note: when a user attempts to change the state of a task to `cancelled`, the server first
-	# puts the task in the `pending_cancellation` state, and then goes through the procedures
-	# described in the specification.
-	'available':            ['cancelled'],
-	'running':              ['cancelled'],
+	Support for virtual resources can't be added here, because ``BulkUpdateValidator`` derives
+	from this class.
+	"""
 
-	'pending_cancellation': [],
-	'cancelled':            [],
-	'terminated':           []
-}
-
-legal_worker_state_transitions = {
-	'inactive':             [],
-	'available':            ['running'],
-	'running':              ['terminated'],
-	'pending_cancellation': ['cancelled', 'terminated'],
-	'cancelled':            [],
-	'terminated':           []
-}
-
-"""
-Note: this dictionary is **not** the union of the two dictionaries above. The dictionaries above
-describe the transitions that an API user is allowed to make. But a state transition requested by a
-user may not necessarily result in the same transition actually being made by the server. For
-example, when the user cancels a task while it is running, the task is actually put in the
-'pending_cancellation' state.
-
-The dictionary below describes the permissible transitions that the *server* is allowed to make. By
-the time the validator is applied to an update, the state transition requested by the user is
-converted into the actual transition that the server must make (see `event_hooks.py` for details).
-This dictionary is used to verify transitions of the latter kind, i.e. the transitions that are
-actually applied to the documents in the database.
-"""
-legal_state_transitions = {
-	'inactive':             ['cancelled', 'available'],
-	'available':            ['cancelled', 'running'],
-	'running':              ['pending_cancellation', 'terminated'],
-	'pending_cancellation': ['cancelled', 'terminated'],
-	'cancelled':            [],
-	'terminated':           []
-}
-
-class Validator(Validator):
-	def __init__(self, schema=None, resource=None, allow_unknown=False,
+	def __init__(self, schema, resource=None, allow_unknown=False, \
 		transparent_schema_rules=False):
+
+		"""
+		The last two arguments are retained despite the fact that they are unused, in order
+		to maintain compatibility with Eve's validator interface.
+		"""
 
 		self.db = app.data.driver.db
 
+		"""
+		``transparent_schema_rules`` is set to ``True``, so that the additional rules for
+		virtual resources will not cause any issues.
+		"""
 		super().__init__(
 			schema=schema,
 			resource=resource,
-			allow_unknown=allow_unknown,
-			transparent_schema_rules=transparent_schema_rules
+			allow_unknown=False,
+			transparent_schema_rules=True
 		)
 
-	"""
-	Called after each POST request, e.g. when a new task is created. Also
-	called each time a subfield needs to be validated. In this case,
-	`context` will be set to the parent field's value, and `update` may be
-	`True`.
-	"""
 	def validate(self, document, schema=None, update=False, context=None):
+		"""
+		Called after each POST request, e.g. when a new task is created. Also called each
+		time a subfield needs to be validated. In this case, ``context`` will be set to the
+		parent field's value, and ``update`` may be `True`.
+		"""
+
 		# We don't have any special constraints to enforce for subfields.
 		if context:
 			return super().validate(document, schema, update, context)
@@ -125,31 +101,45 @@ class Validator(Validator):
 
 		return True
 
-	"""
-	Called after each PATCH request, e.g. when a task is updated in some way.
-	"""
 	def validate_update(self, document, _id, original_document=None):
+		"""
+		Called after each PATCH request, e.g. when a task is updated in some way.
+		"""
+
 		if 'state' in document:
 			si = original_document['state']
 			sf = document['state']
 
-			if sf not in legal_state_transitions[si]:
+			if sf not in legal_transitions[si]:
 				self._error('state', "Illegal state transition from '{}' to '{}'.". \
 					format(si, sf))
 				return False
 
-		# We call the parent's `validate_update` function now, so that
-		# we can ensure that all ObjectIds for continuations are valid.
+
+		"""
+		This is a hack that is necessary in order to get the base class
+		to pass the `resource` parameter to the constructors of the
+		validators for the virtual resources.
+		"""
+		self._Validator__config['resource'] = self.resource
+
+		"""
+		We call the parent's `validate_update` function now, so that we
+		can ensure that all ObjectIds for continuations are valid.
+		"""
 		if not super().validate_update(document, _id, original_document):
 			return False
 
 		return self.validate_continuations(document)
 
-	"""
-	Extends the 'empty' rule so that it can also be applied to lists. Taken
-	from Nicola Iarocci's answer [here](http://stackoverflow.com/a/23708110).
-	"""
 	def _validate_empty(self, empty, field, value):
+		"""
+		Extends the 'empty' rule so that it can also be applied to lists. Taken from Nicola
+		Iarocci's answer here_.
+		
+		.. _here: http://stackoverflow.com/a/23708110
+		"""
+
 		super()._validate_empty(empty, field, value)
 
 		if isinstance(field, list) and not empty and len(value) == 0:
@@ -166,11 +156,12 @@ class Validator(Validator):
 
 		return True
 
-	"""
-	In the schema defined in `settings.py`, a field that is marked `createonly_iff_inactive` may
-	only be initialized if no value is already associated with it for the given document.
-	"""
 	def _validate_createonly(self, createonly, field, value):
+		"""
+		A field that is marked ``createonly`` may only be initialized if no value is already
+		associated with it for the given document.
+		"""
+
 		if not createonly or not self._original_document:
 			return True
 
@@ -181,11 +172,12 @@ class Validator(Validator):
 
 		return True
 
-	"""
-	Like `createonly`, but with the additional restriction that the task must also be in the
-	`inactive` state in order for the field to be set.
-	"""
 	def _validate_creatable_iff_inactive(self, createonly, field, value):
+		"""
+		Like ``createonly``, but with the additional restriction that the task must also be
+		in the ``inactive`` state in order for the field to be set.
+		"""
+
 		if not createonly or not self._original_document:
 			return True
 
@@ -196,12 +188,11 @@ class Validator(Validator):
 		
 		return self._validate_createonly(createonly, field, value)
 
-	"""
-	In the schema defined in `settings.py`, a field that is marked
-	`mutable_iff_inactive` may only be changed while the task is still in
-	the `inactive` state. This function enforces this.
-	"""
 	def _validate_mutable_iff_inactive(self, mutable, field, value):
+		"""
+		Like ``creatable_iff_inactive``, but allows mutation instead of only initialization.
+		"""
+
 		if not mutable or not self._original_document or \
 			self._original_document['state'] == 'inactive':
 			return True
@@ -212,3 +203,145 @@ class Validator(Validator):
 			return False
 
 		return True
+
+class BulkUpdateValidator(ValidatorBase):
+	"""
+	A validator specialized for validating virtual resources.
+	"""
+
+	def __init__(self, schema, resource=None, allow_unknown=False, \
+		transparent_schema_rules=False):
+		"""
+		The last two arguments are retained despite the fact that they are unused, in order
+		to maintain compatibility with Eve's validator interface.
+		"""
+		super().__init__(schema, resource)
+
+	def validate_update_format(self, updates):
+		"""
+		Ensures that the JSON array of updates is in the correct format, without validating
+		the content of any update. This function is factored out of ``validate_update`` so
+		that derived classes can perform intermedidate validation before calling
+		``validate_update_content``.
+		"""
+
+		if not isinstance(updates, list):
+			self._error('updates', "Updates string must be a JSON array.")
+			return False
+
+		if len(updates) > max_update_list_length:
+			self._error('updates', "Updates list can have at most {} elements.". \
+				format(max_update_list_length))
+			return False
+
+		virtual_resource_keys = ['targets', 'values']
+
+		for i, update in enumerate(updates):
+			if not isinstance(update, dict):
+				self._error('update {}'.format(i), "Array element is not a dict.")
+				continue
+
+			cur_issues = []
+			for key in virtual_resource_keys:
+				if key not in update:
+					cur_issues.append("Missing field '{}'.".format(key))
+
+			invalid_keys = update.keys() - virtual_resource_keys
+			if len(invalid_keys) != 0:
+				cur_issues.append("Invalid keys '{}'.".format(invalid_keys))
+
+			if len(cur_issues) > 0:
+				self._error('update {}'.format(i), str(cur_issues))
+
+		for i, update in enumerate(updates):
+			# TODO: fill in default fields for the schema.
+			# TODO: fill in default values for list elements, if specified.
+
+			"""
+			This deserializes some values that require special handlers, such as
+			ObjectIds and datetime objects. If this becomes a bottleneck, then write a
+			custom function that only modifies the fields that are needed.
+			"""
+			updates[i] = serialize(update, schema=self.schema)
+
+		return len(self._errors) == 0
+
+	def validate_update_content(self, updates, original_ids=None, original_documents=None):
+		assert (original_ids and original_documents) or \
+			(not original_ids) and (not original_documents)
+
+		for i, update in enumerate(updates):
+			if original_ids:
+				"""
+				To process rules like ``createonly``, we need the previous values of
+				the fields.
+				"""
+				super().validate_update(updates[i], original_ids[i], \
+					original_documents[i])
+			else:
+				super().validate(updates[i])
+
+		return len(self._errors) == 0
+
+	def validate_update(self, updates, original_ids=None, original_documents=None):
+		"""
+		All requests made to virtual resources are considered to be updates, since according
+		to our design, virtual resources can only be used to modify fields, not update them.
+
+		The fields ``original_ids`` and ``original_documents`` only need to be provided if
+		the documents being altered by the updates have validation rules that require
+		knowledge of the previous values of fields (e.g. ``createonly``).
+
+		Args:
+			updates: The parsed ``dict`` of updates.
+			original_ids: An array of the ids corresponding to the documents in
+				``original_documents`` (optional).
+			original_documents: An array of the original documents corresponding to the
+				IDs in ``updates['targets']`` (optional).
+		"""
+
+		if not self.validate_update_format(updates):
+			return False
+		return self.validate_update_content(updates, original_ids, original_documents)
+
+class Validator(ValidatorBase):
+	"""
+	Adds support for virtual resources to ``ValidatorBase``.
+	"""
+
+	def __init__(self, schema, resource, allow_unknown=False, transparent_schema_rules=False):
+		"""
+		The last two arguments are retained despite the fact that they are unused, in order
+		to maintain compatibility with Eve's validator interface.
+		"""
+
+		self.db = app.data.driver.db
+		self.virtual_validators = {}
+
+		# We use a local import here to avoid cyclic dependencies.
+		from schema import virtual_resources
+
+		for parent_res, virtuals in virtual_resources.items():
+			if parent_res != resource:
+				continue
+
+			for virtual_res, v_schema in virtuals.items():
+				if 'validator' not in v_schema:
+					validator = BulkUpdateValidator
+				else:
+					validator = v_schema['validator']
+					
+				self.virtual_validators[virtual_res] = validator(
+					schema=v_schema['schema'], resource=resource)
+
+		super().__init__(schema, resource)
+
+	def _validate_virtual_resource(self, virtual_resource, field, value):
+		if not virtual_resource:
+			return True
+
+		assert self._id != None
+		assert isinstance(value, list) or isinstance(value, dict)
+
+		dummy = [{'targets': [self._id], 'values': value}]
+		return self.virtual_validators[field].validate_update(dummy)

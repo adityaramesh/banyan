@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 
 """
+banyan.server.mongo_common
+--------------------------
+
 Database utility functions used by many modules.
 """
 

@@ -3,9 +3,22 @@
 This is a specification that dictates how the server and client should respond
 when various prerequisites are fulfilled.
 
-# Implementation Considerations
+# Synchronization
 
-- Use Eve's "event hooks" to implement these.
+- Actions that need locking:
+  - Cancelling a task.
+    - Conflicts with task being made available. This can only happen if there is more than one user
+      with access to the queue. This conflict is benign as long as the task doesn't get claimed,
+      since the cancellation procedure doesn't change, and there are no side effects.
+    - Conflicts with task being made available. Then a worker may end up running a cancelled task.
+    - Conflicts with termination. Then some continuations may end up getting run, while others get
+      cancelled. Continuation lists of parent tasks may no longer be accurate, leading to application      errors.
+  - Terminating a task: see above conflict list.
+  - Running a task: see above conflict list.
+  - Adding/removing continuations.
+
+- This synchronization may lead to problems when many workers claim tasks or report termination of
+  tasks simultaneously. But servicing both kinds of requests requires access to the database anyway,   and this is always serialized. So I'm not sure if the additional overhead will be significant.
 
 # Indices to Potentially Create
 
@@ -95,14 +108,12 @@ when various prerequisites are fulfilled.
   - For each continuation `c`, call `cancel_task(c)`.
 
 - Procedure `cancel_task(task)` (server side).
-  - If `pending_cancellation`, `cancelled`, `terminated`, then do nothing and
-    report success. We return immediately, rather than waiting for the worker's
-    final update regarding the state of the task.
+  - If state is `cancelled` or `terminated`, then do nothing and report success.
   - If `inactive` or `available`, set the state to `cancelled`.
     - Call `cancel_continuations(task)`.
   - If `running`:
     - Using a dedicated socket, send a message to the worker to cancel the task.
-    - Change the state of the task to `unknown`.
+    - Change the state of the task to `pending_cancellation`.
     - When the worker sends the next update for the task to the server, the
       state should either be changed to `terminated` or `cancelled`. This
       causes the worker to execute `cancel_task`.
@@ -187,6 +198,10 @@ when various prerequisites are fulfilled.
 
 - Nothing special.
 
+### Inactive to Cancelled
+
+- Also remove the task from all continuation lists that mention it.
+
 ### Available to Running
 
 - The server fulfills a request from a worker to claim a task.
@@ -220,15 +235,12 @@ when various prerequisites are fulfilled.
 
 ### Running to Pending Cancellation
 
-- In this case, one of the following has happened: the user has cancelled this
-  task, or one of the task's dependencies has been cancelled or has terminated
-  unsuccessfully, and will not be retried.
 - Run the steps described in the section on cancellation above; nothing more
   has to be done.
 
 ### Pending Cancellation to Terminated
 
-- In this case, the server has received a request from the client to change the
+- In this case, the server has received a request from the worker to change the
   status of the task to `terminated` when the current state of the task is
   `pending_cancellation`.
 - Run the steps described in the section on cancellation above.

@@ -1,32 +1,68 @@
 # -*- coding: utf-8 -*-
 
 """
+banyan.server.continuations
+---------------------------
+
 Implements the bookkeeping to manage dependency chains.
+
+**Note that none of the functions in this file is thread-safe.** It is the responsibility of the
+request handlers to ensure that access to resources is synchronized as needed. See
+`specification.md` for details about when synchronization is necessary.
 """
 
 from bson import ObjectId
 from eve.utils import config
 from mongo_common import find_by_id, update_by_id
 
-"""
-The parent task should call this function when a new continuation is added to
-it. Parameters:
-- `child_id`: `ObjectId` of the continuation.
-- `db`: Handle to the `banyan` database.
-"""
+from validation import BulkUpdateValidator
+
+class AddContinuationValidator(BulkUpdateValidator):
+	def __init__(self, schema, resource=None, allow_unknown=False, \
+		transparent_schema_rules=False):
+
+		super().__init__(schema, resource)
+
+	def validate_update(self, updates):
+		if not super().validate_update(updates):
+			return False
+
+		"""
+		We don't perform a full cyclic dependency check, because doing so while holding a
+		lock could cause severe performance degradations. But even in the case that a cyclic
+		dependency occurs, data corruption should not occur.
+		"""
+		for i, update in enumerate(updates):
+			targets, values = update['targets'], update['values']
+			if len(set(values) - set(targets)) != len(values):
+				self._error('update {}'.format(i), "Field 'values' contains ids " \
+					"from 'targets'. This would cause self-loops.")
+
+		return len(self._errors) == 0
+
 def acquire(child_id, db):
+	"""
+	Invoked each time a continuation is added to a parent task.
+
+	Args:
+		child_id: ``ObjectId`` of the continuation.
+		db: Handle to the `banyan` database.
+	"""
+
 	update_by_id('tasks', child_id, db, {
 		'$inc': {'pending_dependency_count': 1},
 		'$currentDate': {config.LAST_UPDATED: True}
 	})
 
-"""
-The the parent task terminates, it should invoke this function on each of its
-continuations.
-- `child_id`: `ObjectId` of the continuation.
-- `db`: Handle to the `banyan` database.
-"""
 def release(child_id, db):
+	"""
+	Invokes for each child continuation a parent task is terminated.
+
+	Args:
+		child_id: ``ObjectId`` of the continuation.
+		db: Handle to the `banyan` database.
+	"""
+
 	child = find_by_id('tasks', child_id, db, {
 		'state': True,
 		'pending_dependency_count': True
@@ -36,30 +72,28 @@ def release(child_id, db):
 	assert child['pending_dependency_count'] >= 1
 	
 	if child['pending_dependency_count'] == 1:
-		update_by_id('tasks', child_id, db,
-			{
-				'$set': {
-					'state': 'available',
-					'pending_dependency_count': 0
-				},
-				'$currentDate': {config.LAST_UPDATED: True}
-			}
-		)
+		update_by_id('tasks', child_id, db, {
+			'$set': {
+				'state': 'available',
+				'pending_dependency_count': 0
+			},
+			'$currentDate': {config.LAST_UPDATED: True}
+		})
 	else:
-		update_by_id('tasks', child_id, db,
-			{
-				'$dec': {'pending_dependency_count': 1},
-				'$currentDate': {config.LAST_UPDATED: True}
-			}
-		)
+		update_by_id('tasks', child_id, db, {
+			'$dec': {'pending_dependency_count': 1},
+			'$currentDate': {config.LAST_UPDATED: True}
+		})
 
-"""
-The parent task should call this function when a continuation is removed from
-it.
-- `child_id`: `ObjectId` of the continuation.
-- `db`: Handle to the `banyan` database.
-"""
 def release_keep_inactive(child_id, db):
+	"""
+	The parent task should call this function when a continuation is removed from it.
+
+	Args:
+		child_id`: ``ObjectId`` of the continuation.
+		db: Handle to the Banyan database.
+	"""
+
 	cursor = find_by_id('tasks', child_id, db, {
 		'state': True,
 		'pending_dependency_count': True
@@ -75,15 +109,17 @@ def release_keep_inactive(child_id, db):
 		}
 	)
 
-"""
-Called only when the parent task is created with no command, directly in the
-'available' state. In this case, the server immediately puts the task in the
-'terminated' state, and attempts to run all of continuations (without modifying
-the dependency counts).
-- `child_id`: `ObjectId` of the continuation.
-- `db`: Handle to the `banyan` database.
-"""
 def try_make_available(child_id, db):
+	"""
+	Called only when the parent task is created with no command, directly in the 'available'
+	state. In this case, the server immediately puts the task in the 'terminated' state, and
+	attempts to run all of continuations (without modifying the dependency counts).
+
+	Args:
+		child_id: ``ObjectId`` of the continuation.
+		db: Handle to the `banyan` database.
+	"""
+
 	child = find_by_id('tasks', child_id, db, {
 		'state': True,
 		'pending_dependency_count': True
@@ -94,46 +130,38 @@ def try_make_available(child_id, db):
 	if child['pending_dependency_count'] == 0:
 		update_by_id('tasks', child_id, db, {'$set': {'state': 'available'}})
 
-"""
-Cancels a task, and recursively cancels all its continuations. Note that the dependency counts of
-the cancelled continuations will continue to be updated as other parent tasks terminate. But none of
-the dependency counts can ever reach zero.
-
-Parameters:
-- `task_id`: Id of the task to be cancelled.
-- `db`: Handle to the `banyan` database.
-"""
 def cancel(task_id, db, assert_inactive=False):
+	"""
+	Cancels a task, and recursively cancels all its continuations.
+	
+	Args:
+		task_id: ID of the task to be cancelled.
+		db: Handle to the `banyan` database.
+		assert_inactive: Flag used to ensure that continuations further down the tree are
+			inactive.
+	"""
+
 	update_by_id('tasks', task_id, db, {'state': 'cancelled'})
 
 	if assert_inactive:
-		task = find_by_id('tasks', task_id, db, {'continuations': True})
-	else:
 		task = find_by_id('tasks', task_id, db, {'continuations': True, 'state': True})
 		assert task['state'] == 'inactive'
+	else:
+		task = find_by_id('tasks', task_id, db, {'continuations': True})
 
 	for child in task['continuations']:
 		cancel(child, db, assert_inactive=True)
 
-"""
-Called when bulk addition of continuations is performed. Checks to ensure that
-a task does not attempt to add itself as a continuation. We don't perform a
-full cyclic dependency check, so it's possible that things can go horribly
-wrong if the user does something stupid.
-"""
-def validate_update(update, log_issue):
-	targets = update['targets']
-	values = update['values']
+	# Remove the continuation from all tasks that mention it.
+	res = db.tasks.update({'continuations': {'$in': [task_id]}},
+		{'$pull': {'continuations': {'$in': [task_id]}}}, multi=True)
 
-	if len(set(values) - set(targets)) != len(values):
-		log_issue("Field 'values' contains ids from 'targets'. This would cause self-loops.")
+def make_additions(updates, db):
+	"""
+	Called after validation in order to perform bulk addition of continuations. If validation
+	was successful, this operation should not fail.
+	"""
 
-"""
-Called after validation in order to perform bulk addition of continuations. If
-validation was successful, this operation should not fail. However, the
-implementation is not atomic.
-"""
-def process_additions(updates, db):
 	for update in updates:
 		for parent in update['targets']:
 			cur = find_by_id('tasks', parent, db, ['continuations'])['continuations']
@@ -144,18 +172,17 @@ def process_additions(updates, db):
 					{'$push': {'continuations': {'$each': new}}})
 				acquire(new, db)
 
-"""
-Called after validation in order to perform bulk removal of continuations. Note
-that if removing a continuation causes its dependency count to go to zero, it
-is not put in the 'available' state automatically. This would complicate the
-design by introducing synchronization issues. Instead, we make it the user's
-responsibility to check whether the dependency count of a continuation reaches
-zero when it is removed.
+def make_removals(updates, db):
+	"""
+	Called after validation in order to perform bulk removal of continuations. If validation was
+	successful, this operation should not fail.
 
-If validation was successful, this operation should not fail. However, the
-implementation is not atomic.
-"""
-def process_removals(updates, db):
+	Note that if removing a continuation causes a child's dependency count to go to zero, the
+	child is **not** put in the 'available' state automatically. This would complicate the
+	design, because we would need to protect against the child task being made available
+	inadvertently by the user. 
+	"""
+
 	for update in updates:
 		for parent in update['targets']:
 			cur = find_by_id('tasks', parent, db, ['continuations'])['continuations']
