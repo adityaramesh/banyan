@@ -8,9 +8,6 @@ Implements a simple, token-based authentication scheme. See ``banyan/auth/access
 information.
 """
 
-from base64 import b64encode
-from bson.binary import Binary
-
 from flask import g, current_app as app
 from eve.auth import TokenAuth as TokenAuthBase
 

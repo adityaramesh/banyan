@@ -40,4 +40,3 @@ max_memory_string_length = 32
 
 time_regex = r'[1-9][0-9]*(.[0-9]*)? (second|minute|hour)s?'
 max_time_string_length = 32
-

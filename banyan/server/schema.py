@@ -9,7 +9,6 @@ Resource schema definitions.
 
 from eve.utils import config
 
-import validation
 import continuations
 import execution_data as execution_data_
 

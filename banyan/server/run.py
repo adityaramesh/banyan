@@ -7,14 +7,12 @@ banyan.server.run
 Starts an instance of the Banyan application.
 """
 
-import os
-import sys
 import socket
 from eve import Eve
 
 from validation import Validator
 from virtual_blueprints import blueprints
-#from event_hooks import EventHooks
+# from event_hooks import EventHooks
 
 def get_public_ip():
 	return socket.gethostbyname(socket.gethostname())

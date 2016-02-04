@@ -14,11 +14,11 @@ from eve.utils import config, debug_error_message
 from eve.validation import ValidationError
 from eve.methods.common import payload
 
-import schema
 from schema import virtual_resources
 
-def make_resource_level_handler(parent_resource, virtual_resource, schema, validator_class, \
+def make_resource_level_handler(parent_resource, virtual_resource, schema, validator_class,
 	on_update):
+
 	"""
 	Defines and returns a request handler for a virtual resource at resource-level granularity.
 	"""
@@ -35,8 +35,9 @@ def make_resource_level_handler(parent_resource, virtual_resource, schema, valid
 			roles += resource['allowed_write_roles']
 
 		auth = resource_auth(parent_resource)
-		if not auth.authorized(roles, parent_resource, request.method):
-			return auth.authenticate()
+		if request.method not in public:
+			if not auth.authorized(roles, parent_resource, request.method):
+				return auth.authenticate()
 
 		issues = {}
 		
@@ -91,7 +92,7 @@ def make_resource_level_handler(parent_resource, virtual_resource, schema, valid
 			raise e
 		except Exception as e:
 			app.logger.exception(e)
-			abort(400, description=debug_error_message("An exception occurred: {}". \
+			abort(400, description=debug_error_message("An exception occurred: {}".
 				format(e)))
 
 		response = {}
@@ -168,5 +169,5 @@ def route(p_res, v_res, schema):
 			return h2(item_id, payload())
 
 for parent_res, virtuals in virtual_resources.items():
-	for virtual_res, schema in virtuals.items():
-		route(parent_res, virtual_res, schema)
+	for virtual_res, v_schema in virtuals.items():
+		route(parent_res, virtual_res, v_schema)

@@ -15,10 +15,10 @@ def find_by_id(resource, targets, db, projection=None):
 
 	if isinstance(targets, ObjectId):
 		doc = db[resource].find_one({config.ID_FIELD: targets}, projection=projection)
-		assert doc != None
+		assert doc is not None
 		return doc
 	else:
-		cursor = db[resource].find({config.ID_FIELD: {'$in': targets}}, \
+		cursor = db[resource].find({config.ID_FIELD: {'$in': targets}},
 			projection=projection)
 		assert cursor.count() == len(targets)
 		return cursor

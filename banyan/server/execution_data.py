@@ -14,7 +14,7 @@ from mongo_common import find_by_id, update_by_id
 from validation import BulkUpdateValidator
 
 class ExecutionDataValidator(BulkUpdateValidator):
-	def __init__(self, schema, resource=None, allow_unknown=False, \
+	def __init__(self, schema, resource=None, allow_unknown=False,
 		transparent_schema_rules=False):
 
 		super().__init__(schema, resource)
@@ -23,16 +23,19 @@ class ExecutionDataValidator(BulkUpdateValidator):
 		if not self.validate_update_format(updates):
 			return False
 
+		assert len(updates) == 1
+		update = updates[0]
+
 		# Ensure that `update_execution_data` is used only at the item level.
-		assert len(updates['targets']) == 1
-		assert isinstance(updates['values'], dict)
+		assert len(update['targets']) == 1
+		assert isinstance(update['values'], dict)
 
 		db = app.data.driver.db
 		task_id = update['targets'][0]
 		task = find_by_id('tasks', task_id, db)
 		
 		assert task[config.ID_FIELD] == task_id
-		assert task != None
+		assert task is not None
 		state = task['state']
 
 		if state in ['inactive', 'cancelled', 'terminated']:
@@ -62,12 +65,12 @@ def make_update(updates, db):
 	db = app.data.driver.db
 	task_id = update['targets'][0]
 	task = find_by_id('tasks', task_id, db)
-	
+
 	assert task[config.ID_FIELD] == task_id
-	assert task != None
+	assert task is not None
 
 	state = task['state']
 	assert state not in ['inactive', 'cancelled', 'terminated']
 
 	task_id = task['execution_data_id']
-	res = update_by_id('execution_info', task_id, db, {'$set': update['values']})
+	update_by_id('execution_info', task_id, db, {'$set': update['values']})

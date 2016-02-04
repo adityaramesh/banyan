@@ -24,7 +24,7 @@ class ValidatorBase(eve.io.mongo.Validator):
 	from this class.
 	"""
 
-	def __init__(self, schema, resource=None, allow_unknown=False, \
+	def __init__(self, schema, resource=None, allow_unknown=False,
 		transparent_schema_rules=False):
 
 		"""
@@ -62,7 +62,7 @@ class ValidatorBase(eve.io.mongo.Validator):
 			"instead of 'validate' with 'update=True'."
 
 		if 'state' in document and document['state'] not in ['inactive', 'available']:
-			self._error('state', "Tasks can only be created in the 'inactive' and " \
+			self._error('state', "Tasks can only be created in the 'inactive' and "
 				"'available' states.")
 			return False
 
@@ -75,14 +75,14 @@ class ValidatorBase(eve.io.mongo.Validator):
 
 	def validate_continuations(self, document):
 		if 'continuations' in document:
-			children = [self.db['tasks'].find_one({'_id': _id}) for _id in \
+			children = [self.db['tasks'].find_one({'_id': _id}) for _id in
 				document['continuations']]
 
 			# It's not practical to check for cyclic dependencies,
 			# but we do perform a basic sanity check.
 			if '_id' in document:
 				if document['_id'] in children:
-					self._error('continuations', "Task cannot have itself " \
+					self._error('continuations', "Task cannot have itself "
 						"as a continuation.")
 					return False
 
@@ -95,7 +95,7 @@ class ValidatorBase(eve.io.mongo.Validator):
 		state = child['state']
 
 		if state != 'inactive':
-			self._error('continuations', "Continuation '{}' should be 'inactive', but " \
+			self._error('continuations', "Continuation '{}' should be 'inactive', but "
 				"is in the '{}' state.".format(child['_id'], state))
 			return False
 
@@ -111,7 +111,7 @@ class ValidatorBase(eve.io.mongo.Validator):
 			sf = document['state']
 
 			if sf not in legal_transitions[si]:
-				self._error('state', "Illegal state transition from '{}' to '{}'.". \
+				self._error('state', "Illegal state transition from '{}' to '{}'.".
 					format(si, sf))
 				return False
 
@@ -166,7 +166,7 @@ class ValidatorBase(eve.io.mongo.Validator):
 			return True
 
 		if field in self._original_document:
-			self._error(field, "Cannot modify field '{}' once it has been set.". \
+			self._error(field, "Cannot modify field '{}' once it has been set.".
 				format(field))
 			return False
 
@@ -182,7 +182,7 @@ class ValidatorBase(eve.io.mongo.Validator):
 			return True
 
 		if self._original_document['state'] != 'inactive':
-			self._error(field, "Cannot set field '{}' when task is no longer in " \
+			self._error(field, "Cannot set field '{}' when task is no longer in "
 				"'inactive' state.".format(field))
 			return False
 		
@@ -198,7 +198,7 @@ class ValidatorBase(eve.io.mongo.Validator):
 			return True
 
 		if field in self._original_document and value != self._original_document[field]:
-			self._error(field, "Cannot change value of field '{}' when task is no " \
+			self._error(field, "Cannot change value of field '{}' when task is no "
 				"longer in 'inactive' state.".format(field))
 			return False
 
@@ -209,12 +209,14 @@ class BulkUpdateValidator(ValidatorBase):
 	A validator specialized for validating virtual resources.
 	"""
 
-	def __init__(self, schema, resource=None, allow_unknown=False, \
+	def __init__(self, schema, resource=None, allow_unknown=False,
 		transparent_schema_rules=False):
+
 		"""
 		The last two arguments are retained despite the fact that they are unused, in order
 		to maintain compatibility with Eve's validator interface.
 		"""
+
 		super().__init__(schema, resource)
 
 	def validate_update_format(self, updates):
@@ -230,7 +232,7 @@ class BulkUpdateValidator(ValidatorBase):
 			return False
 
 		if len(updates) > max_update_list_length:
-			self._error('updates', "Updates list can have at most {} elements.". \
+			self._error('updates', "Updates list can have at most {} elements.".
 				format(max_update_list_length))
 			return False
 
@@ -276,7 +278,7 @@ class BulkUpdateValidator(ValidatorBase):
 				To process rules like ``createonly``, we need the previous values of
 				the fields.
 				"""
-				super().validate_update(updates[i], original_ids[i], \
+				super().validate_update(updates[i], original_ids[i],
 					original_documents[i])
 			else:
 				super().validate(updates[i])
@@ -330,7 +332,7 @@ class Validator(ValidatorBase):
 					validator = BulkUpdateValidator
 				else:
 					validator = v_schema['validator']
-					
+
 				self.virtual_validators[virtual_res] = validator(
 					schema=v_schema['schema'], resource=resource)
 
@@ -340,7 +342,7 @@ class Validator(ValidatorBase):
 		if not virtual_resource:
 			return True
 
-		assert self._id != None
+		assert self._id is not None
 		assert isinstance(value, list) or isinstance(value, dict)
 
 		dummy = [{'targets': [self._id], 'values': value}]
