@@ -14,10 +14,12 @@ from eve.utils import config, debug_error_message
 from eve.validation import ValidationError
 from eve.methods.common import payload
 
+from lock import lock
 from schema import virtual_resources
+from validation import BulkUpdateValidator
 
 def make_resource_level_handler(parent_resource, virtual_resource, schema, validator_class,
-	on_update):
+	on_update, synchronize):
 
 	"""
 	Defines and returns a request handler for a virtual resource at resource-level granularity.
@@ -42,6 +44,9 @@ def make_resource_level_handler(parent_resource, virtual_resource, schema, valid
 		issues = {}
 		
 		try:
+			if synchronize:
+				lock.acquire()
+
 			if not skip_validation:
 				validator = validator_class(schema=schema, resource=parent_resource)
 
@@ -94,6 +99,9 @@ def make_resource_level_handler(parent_resource, virtual_resource, schema, valid
 			app.logger.exception(e)
 			abort(400, description=debug_error_message("An exception occurred: {}".
 				format(e)))
+		finally:
+			if synchronize:
+				lock.release()
 
 		response = {}
 
@@ -111,14 +119,16 @@ def make_resource_level_handler(parent_resource, virtual_resource, schema, valid
 
 	return handler
 
-def make_item_level_handler(parent_resource, virtual_resource, schema, validator, on_update):
+def make_item_level_handler(parent_resource, virtual_resource, schema, validator, on_update, \
+	synchronize):
+
 	"""
 	Same as ``make_resource_level_handler``, but for virtual resources that work at item-level
 	granularity.
 	"""
 
 	handler = make_resource_level_handler(parent_resource, virtual_resource, schema, validator,
-		on_update)
+		on_update, synchronize)
 
 	def scaffold(target_id, values, skip_validation=False):
 		"""
@@ -137,19 +147,20 @@ def make_item_level_handler(parent_resource, virtual_resource, schema, validator
 
 blueprints = []
 
-# TODO authorization.
-# XXX not implemented: rate limiting, authorization, pre-event (see patch.py in Eve).
+# XXX not implemented: rate limiting, pre-event (see patch.py in Eve).
 def route(p_res, v_res, schema):
 	update_schema = schema['schema']
-	on_update = schema['on_update']
-	validator = schema.get('validator')
+	on_update     = schema['on_update']
+	validator     = schema.get('validator') or BulkUpdateValidator
+	synchronize   = schema.get('synchronize') or False
 
 	schema['handlers'] = {}
 	router = Blueprint(p_res + '/' + v_res, __name__)
 	blueprints.append(router)
 
 	if 'resource' in schema['granularity']:
-		h1 = make_resource_level_handler(p_res, v_res, update_schema, validator, on_update)
+		h1 = make_resource_level_handler(p_res, v_res, update_schema, validator, on_update, \
+			synchronize)
 		schema['handlers']['resource_level'] = h1
 
 		@router.route('/' + p_res + '/' + v_res, methods=['POST'])
@@ -157,7 +168,8 @@ def route(p_res, v_res, schema):
 			return h1(payload())
 
 	if 'item' in schema['granularity']:
-		h2 = make_item_level_handler(p_res, v_res, update_schema, validator, on_update)
+		h2 = make_item_level_handler(p_res, v_res, update_schema, validator, on_update, \
+			synchronize)
 		schema['handlers']['item_level'] = h2
 
 		"""

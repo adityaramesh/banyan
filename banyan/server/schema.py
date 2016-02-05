@@ -395,6 +395,7 @@ virtual_resources = {
 			'granularity': ['resource', 'item'],
 			'validator': continuations.AddContinuationValidator,
 			'on_update': continuations.make_additions,
+			'synchronize': True,
 
 			'value_schema': {
 				'type': 'list',
@@ -413,6 +414,7 @@ virtual_resources = {
 		'remove_continuations': {
 			'granularity': ['resource', 'item'],
 			'on_update': continuations.make_removals,
+			'synchronize': True,
 
 			'value_schema': {
 				'type': 'list',
@@ -432,6 +434,7 @@ virtual_resources = {
 			'granularity': ['item'],
 			'validator': execution_data_.ExecutionDataValidator,
 			'on_update': execution_data_.make_update,
+			'synchronize': True,
 
 			'value_schema': {
 				'type': 'dict',

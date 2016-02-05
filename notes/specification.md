@@ -6,7 +6,7 @@ when various prerequisites are fulfilled.
 # Synchronization
 
 - Actions that need locking:
-  - Cancelling a task.
+  - Any state changes:
     - Conflicts with task being made available. This can only happen if there is more than one user
       with access to the queue. This conflict is benign as long as the task doesn't get claimed,
       since the cancellation procedure doesn't change, and there are no side effects.
@@ -16,6 +16,7 @@ when various prerequisites are fulfilled.
   - Terminating a task: see above conflict list.
   - Running a task: see above conflict list.
   - Adding/removing continuations.
+  - Task creation.
 
 - This synchronization may lead to problems when many workers claim tasks or report termination of
   tasks simultaneously. But servicing both kinds of requests requires access to the database anyway,   and this is always serialized. So I'm not sure if the additional overhead will be significant.

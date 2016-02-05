@@ -10,6 +10,7 @@ Provides the event hooks that implement the server-side functionality.
 from flask import g, current_app as app
 from eve.utils import config
 
+from lock import lock
 from schema import virtual_resources
 from mongo_common import find_by_id, update_by_id
 import continuations
@@ -157,8 +158,37 @@ def update_execution_data(updates, original):
 		data_id = original['execution_data_id']
 		update_by_id('execution_info', data_id, db, {'$set': data_updates})
 
+def acquire_lock(request, lookup):
+	lock.acquire()
+
+def release_lock(request, payload):
+	lock.release()
+
+def acquire_lock_if_necessary(request, lookup):
+	if not request.json:
+		return
+
+	synchronized_fields = ['state', 'add_continuations', 'remove_continuations']
+
+	for field in synchronized_fields:
+		if field in request.json:
+			lock.acquire()
+			g.lock_owner = True
+			return
+
+	g.lock_owner = False
+
+def release_lock_if_necessary(request, payload):
+	if g.lock_owner:
+		assert lock.locked()
+		lock.release()
+
 def register(app):
-	# TODO acquire/release locks when appropriate
+	app.on_pre_POST_tasks  += acquire_lock
+	app.on_post_POST_tasks += release_lock
+
+	app.on_pre_PATCH_tasks  += acquire_lock_if_necessary
+	app.on_post_PATCH_tasks += release_lock_if_necessary
 
 	# Event hooks for insertion.
 	app.on_insert_tasks   += terminate_empty_tasks
