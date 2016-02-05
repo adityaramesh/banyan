@@ -118,25 +118,26 @@ def update_execution_data(updates, original):
 
 	db = app.data.driver.db
 	id_ = original[config.ID_FIELD]
-
-	retry_count = original['retry_count']
-	max_retry_count = original['max_retry_count']
 	data_updates = g.virtual_resource_updates.get('update_execution_data')
 
-	if retry_count == 0:
-		assert data_updates is not None
-		new_data = {'task': id_, 'retry_count': 1}
-		new_data.update(data_updates)
-		data_id = db.execution_info.insert(new_data)
+	if 'state' in updates:
+		retry_count = original['retry_count']
+		max_retry_count = original['max_retry_count']
 
-		update_by_id('tasks', id_, db, {
-			'$inc': {'retry_count': 1},
-			'$set': {'execution_data_id': data_id}
-		})
-		return
+		if updates['state'] == 'running' and retry_count == 0:
+			assert data_updates is not None
+			new_data = {'task': id_, 'retry_count': 1}
+			new_data.update(data_updates)
+			data_id = db.execution_info.insert(new_data)
 
-	if updates['state'] == 'terminated' and retry_count < max_retry_count:
-		update_by_id('tasks', id_, db, {'$inc': {'retry_count': 1}})
+			update_by_id('tasks', id_, db, {
+				'$inc': {'retry_count': 1},
+				'$set': {'execution_data_id': data_id}
+			})
+			return
+
+		if updates['state'] == 'terminated' and retry_count < max_retry_count:
+			update_by_id('tasks', id_, db, {'$inc': {'retry_count': 1}})
 
 	if data_updates:
 		data_id = original['execution_data_id']
