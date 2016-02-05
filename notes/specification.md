@@ -1,7 +1,6 @@
 # Overview
 
-This is a specification that dictates how the server and client should respond
-when various prerequisites are fulfilled.
+This is the specification for the server's interface.
 
 # Synchronization
 
