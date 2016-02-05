@@ -7,11 +7,11 @@ banyan.server.validation
 Defines custom validators for resource schema.
 """
 
-from flask import current_app as app
+from flask import g, current_app as app
 from eve.methods.common import serialize
 import eve.io.mongo
 
-from state import legal_transitions
+from state import legal_provider_transitions, legal_worker_transitions
 from constants import *
 
 class ValidatorBase(eve.io.mongo.Validator):
@@ -101,20 +101,59 @@ class ValidatorBase(eve.io.mongo.Validator):
 
 		return True
 
+	def validate_state_change(self, final_state, update, required_fields):
+		def fail():
+			self._error('state', "State cannot be changed to '{}' without setting " \
+				"fields '{}' using 'update_execution_data'.".format(final_state,
+				required_fields))
+			return False
+
+		if 'update_execution_data' not in update:
+			return fail()
+
+		updated_fields = set(update['update_execution_data'].keys())
+		if len(updated_fields & required_fields) != len(required_fields):
+			return fail()
+
+		return True
+
 	def validate_update(self, document, _id, original_document=None):
 		"""
 		Called after each PATCH request, e.g. when a task is updated in some way.
 		"""
 
+		# The authorization token and corresponding user are set by the authenticator.
+		assert g.user is not None
+		role = g.user['role']
+
 		if 'state' in document:
 			si = original_document['state']
 			sf = document['state']
 
-			if sf not in legal_transitions[si]:
-				self._error('state', "Illegal state transition from '{}' to '{}'.".
-					format(si, sf))
+			legal_trans = legal_provider_transitions if role == 'provider' else \
+				legal_worker_transitions
+
+			if sf not in legal_trans[si]:
+				self._error('state', "User with role '{}' is not authorized to " \
+					"make state transition from '{}' to '{}'.".format(si, sf))
 				return False
 
+			if sf == 'running':
+				if not self.validate_state_change(sf, update,
+					required_fields={'worker'}):
+					return False
+			elif sf in ['cancelled', 'terminated']:
+				if not self.validate_state_change(sf, update,
+					required_fields={'exit_status', 'time_terminated'}):
+					return False
+		elif 'update_execution_data' in update:
+			keys = set(update['update_execution_data'].keys())
+			special_keys = {'worker', 'exit_status', 'time_terminated'}
+			common_keys = keys & special_keys
+
+			if len(common_keys) != 0:
+				self._error('update_execution_data', "The fields '{}' cannot be " \
+					"changed independently of the task state.")
 
 		"""
 		This is a hack that is necessary in order to get the base class
