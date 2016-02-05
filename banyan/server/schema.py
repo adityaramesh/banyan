@@ -445,4 +445,4 @@ for parent_res, virtuals in virtual_resources.items():
 	for virtual_res, schema in virtuals.items():
 		schema['schema'] = dict(target_schema)
 		schema['schema']['values'] = schema['value_schema']
-		globals()[parent_res]['schema'][virtual_res] = schema['value_schema']
+		globals()[parent_res]['schema'][virtual_res] = {'virtual_resource': True}

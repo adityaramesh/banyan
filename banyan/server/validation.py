@@ -146,7 +146,7 @@ class ValidatorBase(eve.io.mongo.Validator):
 				if not self.validate_state_change(sf, update,
 					required_fields={'exit_status', 'time_terminated'}):
 					return False
-		elif 'update_execution_data' in update:
+		elif 'update_execution_data' in document:
 			keys = set(update['update_execution_data'].keys())
 			special_keys = {'worker', 'exit_status', 'time_terminated'}
 			common_keys = keys & special_keys
@@ -385,4 +385,11 @@ class Validator(ValidatorBase):
 		assert isinstance(value, list) or isinstance(value, dict)
 
 		dummy = [{'targets': [self._id], 'values': value}]
-		return self.virtual_validators[field].validate_update(dummy)
+		validator = self.virtual_validators[field]
+
+		if not validator.validate_update(dummy):
+			for k, v in validator.errors.items():
+				self._error(k, v)
+			return False
+
+		return True
