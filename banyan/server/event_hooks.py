@@ -99,6 +99,16 @@ def process_continuations(updates, original):
 		for x in cont_list:
 			continuations.cancel(x, db)
 	elif updates['state'] == 'terminated':
+		data = find_by_id('execution_info', original['execution_data_id'], db,
+			{'exit_status': True})
+
+		"""
+		We don't cancel the continuations on unsuccessful termination,
+		because this would defeat the purpose of the retry count.
+		"""
+		if data['exit_status'] != 0:
+			return
+
 		for x in cont_list:
 			continuations.release(x, db)
 
