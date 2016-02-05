@@ -7,7 +7,7 @@ banyan.server.state
 Defines legal state transitions for API users.
 """
 
-legal_user_transitions = {
+legal_provider_transitions = {
 	'inactive':             ['cancelled', 'available'],
 
 	# Note: when a user attempts to change the state of a task to `cancelled`, the server first
@@ -31,6 +31,6 @@ legal_worker_transitions = {
 }
 
 legal_transitions = {}
-for si, sf_1 in legal_user_transitions.items():
+for si, sf_1 in legal_provider_transitions.items():
 	sf_2 = legal_worker_transitions[si]
 	legal_transitions[si] = sf_1 + sf_2

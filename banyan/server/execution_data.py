@@ -33,7 +33,7 @@ class ExecutionDataValidator(BulkUpdateValidator):
 		db = app.data.driver.db
 		task_id = update['targets'][0]
 		task = find_by_id('tasks', task_id, db)
-		
+
 		assert task[config.ID_FIELD] == task_id
 		assert task is not None
 		state = task['state']
@@ -43,9 +43,25 @@ class ExecutionDataValidator(BulkUpdateValidator):
 				format(state))
 			return False
 
-		assert 'execution_data_id' in task
+		"""
+		This branch is taken if the ``execution_data`` entry for this
+		task has not been created yet. After validation, a callback
+		registered with an event hook will create a new entry.
+		"""
+		if 'execution_data_id' not in task:
+			return super().validate_update_content(updates)
+
 		target_id = task['execution_data_id']
 		target = find_by_id('execution_info', target_id, db)
+
+		"""
+		This branch is taken if the current ``execution_data`` entry
+		for this task is out of date (i.e. a worker attempted to run
+		this task before, but failed). After validation, a callback
+		registered with an event hook will create a new entry.
+		"""
+		if target['retry_count'] != task['retry_count']:
+			return super().validate_update_content(updates)
 
 		return super().validate_update_content(updates, original_ids=[target_id],
 			original_documents=[target])
