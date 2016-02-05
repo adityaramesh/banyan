@@ -4,8 +4,7 @@
 banyan.server.event_hooks
 -------------------------
 
-Provides the event hooks that implement the server-side functionality not
-falling under the purview of REST.
+Provides the event hooks that implement the server-side functionality.
 """
 
 from flask import g, current_app as app
