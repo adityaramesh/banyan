@@ -135,19 +135,20 @@ class ValidatorBase(eve.io.mongo.Validator):
 
 			if sf not in legal_trans[si]:
 				self._error('state', "User with role '{}' is not authorized to " \
-					"make state transition from '{}' to '{}'.".format(si, sf))
+					"make state transition from '{}' to '{}'.".format(role, si,
+					sf))
 				return False
 
 			if sf == 'running':
-				if not self.validate_state_change(sf, update,
+				if not self.validate_state_change(sf, document,
 					required_fields={'worker'}):
 					return False
 			elif sf in ['cancelled', 'terminated']:
-				if not self.validate_state_change(sf, update,
+				if not self.validate_state_change(sf, document,
 					required_fields={'exit_status', 'time_terminated'}):
 					return False
 		elif 'update_execution_data' in document:
-			keys = set(update['update_execution_data'].keys())
+			keys = set(document['update_execution_data'].keys())
 			special_keys = {'worker', 'exit_status', 'time_terminated'}
 			common_keys = keys & special_keys
 

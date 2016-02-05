@@ -93,10 +93,14 @@ def process_continuations(updates, original):
 	if not 'state' in updates:
 		return
 
+	cont_list = original['continuations']
+
 	if updates['state'] == 'cancelled':
-		continuations.cancel(original[config.ID_FIELD], db)
+		for x in cont_list:
+			continuations.cancel(x, db)
 	elif updates['state'] == 'terminated':
-		continuations.release(original[config.ID_FIELD], db)
+		for x in cont_list:
+			continuations.release(x, db)
 
 def update_execution_data(updates, original):
 	"""
@@ -141,7 +145,7 @@ def update_execution_data(updates, original):
 
 	if data_updates:
 		data_id = original['execution_data_id']
-		update_by_id('execution_info', data_id, db, data_updates)
+		update_by_id('execution_info', data_id, db, {'$set': data_updates})
 
 def register(app):
 	# TODO acquire/release locks when appropriate

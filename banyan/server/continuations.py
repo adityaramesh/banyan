@@ -56,7 +56,7 @@ def acquire(child_id, db):
 
 def release(child_id, db):
 	"""
-	Invokes for each child continuation a parent task is terminated.
+	Invoked for each child continuation when a parent task is terminated.
 
 	Args:
 		child_id: ``ObjectId`` of the continuation.
@@ -70,14 +70,14 @@ def release(child_id, db):
 
 	assert child['state'] == 'inactive'
 	assert child['pending_dependency_count'] >= 1
-	
+
 	if child['pending_dependency_count'] == 1:
 		update_by_id('tasks', child_id, db, {
 			'$set': {
 				'state': 'available',
 				'pending_dependency_count': 0
-			},
-			'$currentDate': {config.LAST_UPDATED: True}
+			}#,
+			#'$currentDate': {config.LAST_UPDATED: True}
 		})
 	else:
 		update_by_id('tasks', child_id, db, {
@@ -141,7 +141,7 @@ def cancel(task_id, db, assert_inactive=False):
 			inactive.
 	"""
 
-	update_by_id('tasks', task_id, db, {'state': 'cancelled'})
+	update_by_id('tasks', task_id, db, {'$set': {'state': 'cancelled'}})
 
 	if assert_inactive:
 		task = find_by_id('tasks', task_id, db, {'continuations': True, 'state': True})
