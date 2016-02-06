@@ -42,7 +42,7 @@ def make_resource_level_handler(parent_resource, virtual_resource, schema, valid
 				return auth.authenticate()
 
 		issues = {}
-		
+
 		try:
 			if synchronize:
 				lock.acquire()
@@ -119,7 +119,7 @@ def make_resource_level_handler(parent_resource, virtual_resource, schema, valid
 
 	return handler
 
-def make_item_level_handler(parent_resource, virtual_resource, schema, validator, on_update, \
+def make_item_level_handler(parent_resource, virtual_resource, schema, validator, on_update,
 	synchronize):
 
 	"""
@@ -159,7 +159,7 @@ def route(p_res, v_res, schema):
 	blueprints.append(router)
 
 	if 'resource' in schema['granularity']:
-		h1 = make_resource_level_handler(p_res, v_res, update_schema, validator, on_update, \
+		h1 = make_resource_level_handler(p_res, v_res, update_schema, validator, on_update,
 			synchronize)
 		schema['handlers']['resource_level'] = h1
 
@@ -168,7 +168,7 @@ def route(p_res, v_res, schema):
 			return h1(payload())
 
 	if 'item' in schema['granularity']:
-		h2 = make_item_level_handler(p_res, v_res, update_schema, validator, on_update, \
+		h2 = make_item_level_handler(p_res, v_res, update_schema, validator, on_update,
 			synchronize)
 		schema['handlers']['item_level'] = h2
 

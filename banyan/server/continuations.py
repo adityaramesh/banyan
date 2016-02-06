@@ -11,14 +11,13 @@ request handlers to ensure that access to resources is synchronized as needed. S
 `specification.md` for details about when synchronization is necessary.
 """
 
-from bson import ObjectId
 from eve.utils import config
 from mongo_common import find_by_id, update_by_id
 
 from validation import BulkUpdateValidator
 
 class AddContinuationValidator(BulkUpdateValidator):
-	def __init__(self, schema, resource=None, allow_unknown=False, \
+	def __init__(self, schema, resource=None, allow_unknown=False,
 		transparent_schema_rules=False):
 
 		super().__init__(schema, resource)
@@ -35,8 +34,8 @@ class AddContinuationValidator(BulkUpdateValidator):
 		for i, update in enumerate(updates):
 			targets, values = update['targets'], update['values']
 			if len(set(values) - set(targets)) != len(values):
-				self._error('update {}'.format(i), "Field 'values' contains ids " \
-					"from 'targets'. This would cause self-loops.")
+				self._error('update {}'.format(i), "Field 'values' contains ids from "
+					"'targets'. This would cause self-loops.")
 
 		return len(self._errors) == 0
 
@@ -76,8 +75,8 @@ def release(child_id, db):
 			'$set': {
 				'state': 'available',
 				'pending_dependency_count': 0
-			}#,
-			#'$currentDate': {config.LAST_UPDATED: True}
+			},
+			'$currentDate': {config.LAST_UPDATED: True}
 		})
 	else:
 		update_by_id('tasks', child_id, db, {
@@ -102,12 +101,11 @@ def release_keep_inactive(child_id, db):
 	for child in cursor:
 		assert child['state'] == 'inactive'
 		assert child['pending_dependency_count'] >= 1
-	
+
 	update_by_id('tasks', child_id, db, {
-			'$inc': {'pending_dependency_count': -1},
-			'$currentDate': {config.LAST_UPDATED: True}
-		}
-	)
+		'$inc': {'pending_dependency_count': -1},
+		'$currentDate': {config.LAST_UPDATED: True}
+	})
 
 def try_make_available(child_id, db):
 	"""
@@ -133,7 +131,7 @@ def try_make_available(child_id, db):
 def cancel(task_id, db, assert_inactive=False):
 	"""
 	Cancels a task, and recursively cancels all its continuations.
-	
+
 	Args:
 		task_id: ID of the task to be cancelled.
 		db: Handle to the `banyan` database.
@@ -153,7 +151,7 @@ def cancel(task_id, db, assert_inactive=False):
 		cancel(child, db, assert_inactive=True)
 
 	# Remove the continuation from all tasks that mention it.
-	res = db.tasks.update({'continuations': {'$in': [task_id]}},
+	db.tasks.update({'continuations': {'$in': [task_id]}},
 		{'$pull': {'continuations': {'$in': [task_id]}}}, multi=True)
 
 def make_additions(updates, db):
@@ -168,7 +166,7 @@ def make_additions(updates, db):
 			new = list(set(update['values']) - set(cur))
 
 			if len(new) != 0:
-				update_by_id('tasks', parent, db, \
+				update_by_id('tasks', parent, db,
 					{'$push': {'continuations': {'$each': new}}})
 				acquire(new, db)
 
@@ -180,7 +178,7 @@ def make_removals(updates, db):
 	Note that if removing a continuation causes a child's dependency count to go to zero, the
 	child is **not** put in the 'available' state automatically. This would complicate the
 	design, because we would need to protect against the child task being made available
-	inadvertently by the user. 
+	inadvertently by the user.
 	"""
 
 	for update in updates:
@@ -189,6 +187,6 @@ def make_removals(updates, db):
 			rm = list(set(update['values']) & set(cur))
 
 			if len(rm) != 0:
-				update_by_id('tasks', parent, db, \
+				update_by_id('tasks', parent, db,
 					{'$pull': {'continuations': {'$in': rm}}})
 				release_keep_inactive(rm, db)

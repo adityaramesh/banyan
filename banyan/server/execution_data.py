@@ -39,7 +39,7 @@ class ExecutionDataValidator(BulkUpdateValidator):
 		state = task['state']
 
 		if state in ['inactive', 'cancelled', 'terminated']:
-			self._error('target', "Cannot update execution data of task in '{}' state.". \
+			self._error('target', "Cannot update execution data of task in '{}' state.".
 				format(state))
 			return False
 

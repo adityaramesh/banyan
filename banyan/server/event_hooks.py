@@ -27,6 +27,8 @@ def terminate_empty_tasks(items):
 			item['state'] = 'terminated'
 
 def acquire_continuations(items):
+	db = app.data.driver.db
+
 	for item in items:
 		if item['state'] == 'terminated':
 			assert 'command' not in item, "This branch should be entered iff " \
@@ -34,10 +36,10 @@ def acquire_continuations(items):
 				"'available' state."
 
 			for cont_id in item['continuations']:
-				continuations.try_make_available(cont_id, self.db)
+				continuations.try_make_available(cont_id, db)
 		else:
 			for cont_id in item['continuations']:
-				continuations.acquire(cont_id, self.db)
+				continuations.acquire(cont_id, db)
 
 def filter_virtual_resources(updates, original):
 	"""
@@ -91,7 +93,7 @@ def process_continuations(updates, original):
 			'values': g.virtual_resource_updates['remove_continuations'],
 		}], db)
 
-	if not 'state' in updates:
+	if 'state' not in updates:
 		return
 
 	cont_list = original['continuations']

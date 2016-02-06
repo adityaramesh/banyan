@@ -127,7 +127,7 @@ tasks = {
 				# Waiting to be claimed by a worker.
 				'available',
 
-				#Currently being run by a worker.
+				# Currently being run by a worker.
 				'running',
 
 				# The server puts a task in this state when it is cancelled while in

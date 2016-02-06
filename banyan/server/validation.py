@@ -103,7 +103,7 @@ class ValidatorBase(eve.io.mongo.Validator):
 
 	def validate_state_change(self, final_state, update, required_fields):
 		def fail():
-			self._error('state', "State cannot be changed to '{}' without setting " \
+			self._error('state', "State cannot be changed to '{}' without setting "
 				"fields '{}' using 'update_execution_data'.".format(final_state,
 				required_fields))
 			return False
@@ -134,18 +134,17 @@ class ValidatorBase(eve.io.mongo.Validator):
 				legal_worker_transitions
 
 			if sf not in legal_trans[si]:
-				self._error('state', "User with role '{}' is not authorized to " \
-					"make state transition from '{}' to '{}'.".format(role, si,
-					sf))
+				self._error('state', "User with role '{}' is not authorized to make "
+					"state transition from '{}' to '{}'.".format(role, si, sf))
 				return False
 
 			if sf == 'running':
 				if not self.validate_state_change(sf, document,
-					required_fields={'worker'}):
+						required_fields={'worker'}):
 					return False
 			elif sf in ['cancelled', 'terminated']:
 				if not self.validate_state_change(sf, document,
-					required_fields={'exit_status', 'time_terminated'}):
+						required_fields={'exit_status', 'time_terminated'}):
 					return False
 		elif 'update_execution_data' in document:
 			keys = set(document['update_execution_data'].keys())
@@ -153,7 +152,7 @@ class ValidatorBase(eve.io.mongo.Validator):
 			common_keys = keys & special_keys
 
 			if len(common_keys) != 0:
-				self._error('update_execution_data', "The fields '{}' cannot be " \
+				self._error('update_execution_data', "The fields '{}' cannot be "
 					"changed independently of the task state.")
 
 		"""
@@ -176,7 +175,7 @@ class ValidatorBase(eve.io.mongo.Validator):
 		"""
 		Extends the 'empty' rule so that it can also be applied to lists. Taken from Nicola
 		Iarocci's answer here_.
-		
+
 		.. _here: http://stackoverflow.com/a/23708110
 		"""
 
@@ -225,7 +224,7 @@ class ValidatorBase(eve.io.mongo.Validator):
 			self._error(field, "Cannot set field '{}' when task is no longer in "
 				"'inactive' state.".format(field))
 			return False
-		
+
 		return self._validate_createonly(createonly, field, value)
 
 	def _validate_mutable_iff_inactive(self, mutable, field, value):
