@@ -6,9 +6,12 @@ Resource configuration:
   - Get information about total system resources.
   - Determine maximum number of resources that will be consumed by this worker
     (using a niceness level).
+    - When determining the number of available cores, take utilization of each
+      core into account (perhaps don't include cores that have CPU utilization
+      of 60% or more).
   - Set the limit to
 
-  	min(available resources not including our own processes - max(
+  	min(available resources - max(
 		max resources requested by our running processes,
 		resources actually used by our running processes
 	), maximum consumable).
@@ -36,6 +39,11 @@ Cancellation:
   - Periodically check a message buffer as part of the overall loop.
   - The server sends cancellation messages to the worker by delivering to this
     message buffer.
+    - This buffer should also be used when the server needs to know about
+      overall usage statistics. The worker then sends a response to the server.
+    - Do we need a separate resource on the server for resources available on each worker?
+      - Other solution: associate with user database.
+      - Reuse `resource_info` for schema?
   - For each cancellation message:
     - If the corresponding task has already been cancelled or terminated:
       - Send a reply using the saved information.
@@ -43,8 +51,5 @@ Cancellation:
       - Mark the job as pending cancellation.
       - Use SIGTERM/SIGKILL based on the wait times associated with that task.
 
-Periodic updates:
-  - TODO (about jobs and about available resources).
-  - Do we need a separate resource on the server for resources available on each worker?
-    - Other solution: associate with user database.
-    - Reuse `resource_info` for schema?
+Updates about job resource usage:
+  - TODO
