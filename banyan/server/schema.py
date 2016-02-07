@@ -32,10 +32,18 @@ resource_info = {
 		'required': True
 	},
 
-	'cores': {
-		'type': 'integer',
-		'min': 1,
-		'default': 1
+	# We can view CPU utilization as a resource, where the total amount available is given by
+	# 100 times the number of available GPUs on a given worker. This field restricts the
+	# cumulative CPU utilization of our processes on the worker.
+	#
+	# Setting this value to 100 means that the scheduler will only run this task on an idle
+	# core (with analogous interpretations for 200, 300, etc.). A value of 250, for instance,
+	# would mean that the scheduler would only run this task if there are two idle cores, and a
+	# core with around 50% or less utilization.
+	'cpu_utilization_percent': {
+		'type': 'float',
+		'min': 0,
+		'default': 0
 	},
 
 	'gpus': {
@@ -49,6 +57,7 @@ resource_info = {
 					'maxlength': max_memory_string_length,
 					'required': True
 				},
+
 				'min_compute_capability': {
 					'type': 'string',
 					'regex': r'\d\.\d',
@@ -60,6 +69,27 @@ resource_info = {
 		}
 	}
 }
+
+"""
+TODO: if we add a schema for overall resource usage reported by workers, then include the following
+comments for each GPU: ::
+
+	# The following two fields are obtained from ``nvmlDeviceGetutilizationRates``.
+
+	'utilization_percent': {
+		'type': 'float',
+		'required': True,
+		'min': 0,
+		'max': 100
+	},
+
+	'memory_access_percent': {
+		'type': 'float',
+		'required': True,
+		'min': 0,
+		'max': 100
+	}
+"""
 
 execution_data = {
 	'task': {
@@ -157,6 +187,13 @@ tasks = {
 			}
 		},
 
+		'requested_resources': {
+			'type': 'dict',
+			'dependencies': ['command'],
+			'mutable_iff_inactive': True,
+			'schema': resource_info
+		},
+
 		# This field is not required, and we don't enforce that the task terminates within
 		# the amount of time given below. Its purpose is to allow the user to compute time
 		# estimates for task chains.
@@ -170,13 +207,6 @@ tasks = {
 			# continuations but no command), then it makes no sense for the user to
 			# provide a value for this field.
 			'dependencies': ['command']
-		},
-
-		'requested_resources': {
-			'type': 'dict',
-			'dependencies': ['command'],
-			'mutable_iff_inactive': True,
-			'schema': resource_info
 		},
 
 		# The amount of time a worker will wait for a task to terminate after sending it
@@ -255,8 +285,14 @@ memory_usage = {
 
 		'resident_memory_bytes': {
 			'type': 'integer',
-			'min': 0,
-			'required': True
+			'required': True,
+			'min': 0
+		},
+
+		'virtual_memory_bytes': {
+			'type': 'integer',
+			'required': True,
+			'min': 0
 		}
 	}
 }
@@ -279,27 +315,28 @@ cpu_usage = {
 			'required': True
 		},
 
-		'usage': {
-			'type': 'list',
-			'empty': False,
-			'schema': {
-				'core': {
-					'type': 'integer',
-					'min': 0,
-					'required': True
-				},
-
-				'utilization_ratio': {
-					'type': 'float',
-					'min': 0,
-					'max': 1,
-					'required': True
-				}
-			}
+		# It would be nice to have per-core CPU usage, but ``psutil``
+		# does not provide a function for this as of the time of
+		# writing.
+		'utilization_percent': {
+			'type': 'float',
+			'required': True,
+			'min': 0
 		}
+
+		# It would be nice to have a list of cores on which the process
+		# is running, but obtaining this information is not trivial
+		# (even htop does not provide this).
+
+		# TODO: support for NUMA topologies using ``libnuma``?
 	}
 }
 
+"""
+Not used for the time being, because only Tesla GPUs provide process and
+utilization information.  I don't want to complicate things by making special
+cases based on the GPU model right now.
+"""
 gpu_usage = {
 	'authentication': TokenAuth,
 	'resource_methods': ['GET', 'POST'],
@@ -318,23 +355,25 @@ gpu_usage = {
 			'required': True
 		},
 
-		'gpu': {
-			'type': 'integer',
-			'min': 0,
-			'required': True
-		},
+		'gpus': {
+			'type': 'list',
+			'schema': {
+				'type': 'dict',
+				'schema': {
+					'ordinal': {
+						'type': 'integer',
+						'required': True,
+						'min': 0
+					},
 
-		'resident_memory_bytes': {
-			'type': 'integer',
-			'min': 0,
-			'required': True
-		},
-
-		'utilization_ratio': {
-			'type': 'float',
-			'min': 0,
-			'max': 1,
-			'required': True
+					# Obtained from ``nvmlDeviceGetComputeRunningProcesses``.
+					'used_memory_bytes': {
+						'type': 'integer',
+						'required': True,
+						'min': 0
+					}
+				}
+			}
 		}
 	}
 }
