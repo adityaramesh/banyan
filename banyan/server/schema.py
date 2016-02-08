@@ -29,13 +29,9 @@ resource_info = {
 		'type': 'string',
 		'regex': memory_regex,
 		'maxlength': max_memory_string_length,
-		'required': True
+		'default': '128 MiB'
 	},
 
-	# We can view CPU utilization as a resource, where the total amount available is given by
-	# 100 times the number of available GPUs on a given worker. This field restricts the
-	# cumulative CPU utilization of our processes on the worker.
-	#
 	# Setting this value to 100 means that the scheduler will only run this task on an idle
 	# core (with analogous interpretations for 200, 300, etc.). A value of 250, for instance,
 	# would mean that the scheduler would only run this task if there are two idle cores, and a
@@ -48,6 +44,7 @@ resource_info = {
 
 	'gpus': {
 		'type': 'list',
+		'default': [],
 		'schema': {
 			'type': 'dict',
 			'schema': {
