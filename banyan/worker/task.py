@@ -9,7 +9,7 @@ Implementation of shell command as runnable task.
 
 from collections import namedtuple
 
-from time import time
+from timeit import default_timer as timer
 from datetime import datetime
 
 from subprocess import Popen
@@ -52,7 +52,7 @@ class Task:
 			return
 
 		self.terminate()
-		self.sigterm_start = time()
+		self.sigterm_start = timer()
 		self.waiting_for_sigterm = True
 
 	def status(self):
@@ -63,7 +63,7 @@ class Task:
 		if not self.proc.waiting_for_sigterm:
 			return
 
-		if time() - self.sigterm_start > self.max_termination_time:
+		if timer() - self.sigterm_start > self.max_termination_time:
 			self.proc.kill()
 			self.waiting_for_sigterm = False
 
