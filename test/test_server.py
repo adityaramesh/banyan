@@ -1,7 +1,12 @@
 # -*- coding: utf-8 -*-
 
 """
+test.test_server
+----------------
+
 Tests the server.
+
+TODO: revise this. it's probably not compatible with the current version anymore.
 """
 
 import socket
