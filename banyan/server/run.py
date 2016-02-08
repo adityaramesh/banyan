@@ -10,9 +10,14 @@ Starts an instance of the Banyan application.
 from eve import Eve
 import socket
 
-from validation import Validator
-from virtual_blueprints import blueprints
-import event_hooks
+# Gives us access to the module hierarchy.
+import os
+import sys
+sys.path.insert(1, os.path.join(sys.path[0], '../..'))
+
+from banyan.server.validation import Validator
+from banyan.server.virtual_blueprints import blueprints
+import banyan.server.event_hooks as event_hooks
 
 def get_public_ip():
 	return socket.gethostbyname(socket.gethostname())

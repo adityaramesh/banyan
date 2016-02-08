@@ -11,8 +11,8 @@ from flask import g, current_app as app
 from eve.methods.common import serialize
 import eve.io.mongo
 
-from state import legal_provider_transitions, legal_worker_transitions
-from constants import *
+from banyan.server.state import legal_provider_transitions, legal_worker_transitions
+from banyan.server.constants import *
 
 class ValidatorBase(eve.io.mongo.Validator):
 	"""

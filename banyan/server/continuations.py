@@ -13,8 +13,8 @@ request handlers to ensure that access to resources is synchronized as needed. S
 
 from eve.utils import config
 
-from mongo_common import find_by_id, update_by_id
-from validation import BulkUpdateValidator
+from banyan.server.mongo_common import find_by_id, update_by_id
+from banyan.server.validation import BulkUpdateValidator
 
 class AddContinuationValidator(BulkUpdateValidator):
 	def __init__(self, schema, resource=None, allow_unknown=False,

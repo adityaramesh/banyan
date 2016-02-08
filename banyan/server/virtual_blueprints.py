@@ -14,9 +14,9 @@ from eve.utils import config, debug_error_message
 from eve.validation import ValidationError
 from eve.methods.common import payload
 
-from lock import lock
-from schema import virtual_resources
-from validation import BulkUpdateValidator
+from banyan.server.lock import lock
+from banyan.server.schema import virtual_resources
+from banyan.server.validation import BulkUpdateValidator
 
 def make_resource_level_handler(parent_resource, virtual_resource, schema, validator_class,
 	on_update, synchronize):

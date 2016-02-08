@@ -9,11 +9,11 @@ Resource schema definitions.
 
 from eve.utils import config
 
-import continuations
-import execution_data as execution_data_
+import banyan.server.continuations as continuations
+import banyan.server.execution_data as execution_data_
 
-from constants import *
-from authentication import TokenAuth, RestrictCreationToProviders
+from banyan.server.constants import *
+from banyan.server.authentication import TokenAuth, RestrictCreationToProviders
 
 """
 XXX: Don't use multiline strings to write comments inside of dicts, because the

@@ -8,7 +8,7 @@ Configuration settings for Eve.
 """
 
 import os
-from schema import tasks, memory_usage, cpu_usage, gpu_usage
+from banyan.server.schema import tasks, memory_usage, cpu_usage, gpu_usage
 
 # XXX: remove after testing.
 DEBUG = True

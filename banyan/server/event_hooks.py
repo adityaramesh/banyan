@@ -10,10 +10,10 @@ Provides the event hooks that implement the server-side functionality.
 from flask import g, current_app as app
 from eve.utils import config
 
-from lock import lock
-from schema import virtual_resources
-from mongo_common import find_by_id, update_by_id
-import continuations
+from banyan.server.lock import lock
+from banyan.server.schema import virtual_resources
+from banyan.server.mongo_common import find_by_id, update_by_id
+import banyan.server.continuations as continuations
 
 item_level_virtual_resources = set()
 for parent_res, virtuals in virtual_resources.items():
