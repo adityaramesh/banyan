@@ -9,8 +9,8 @@ Implementation of shell command as runnable task.
 
 from collections import namedtuple
 
-from timeit import default_timer as timer
 from datetime import datetime
+from timeit import default_timer as timer
 
 from subprocess import Popen
 from psutil import Process
@@ -37,7 +37,7 @@ class Task:
 		self.waiting_for_sigterm  = False
 
 	def run(self):
-		self.proc = Popen(self.command)
+		self.proc = Popen(self.command, shell=True)
 		self.proc_info = Process(self.proc.pid)
 		self.time_started = datetime.now()
 
@@ -56,11 +56,11 @@ class Task:
 		self.waiting_for_sigterm = True
 
 	def status(self):
-		if self.proc.returncode:
+		if self.proc.poll() is not None:
 			self.time_terminated = datetime.now()
 			return self.proc.returncode
 
-		if not self.proc.waiting_for_sigterm:
+		if not self.waiting_for_sigterm:
 			return
 
 		if timer() - self.sigterm_start > self.max_termination_time:
@@ -69,7 +69,7 @@ class Task:
 
 	def usage(self):
 		info = self.proc_info
-		mem = info.memory_usage()
+		mem = info.memory_info()
 
 		return TaskResourceUsage(
 			resident_memory_bytes=mem[0],

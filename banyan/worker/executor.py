@@ -48,8 +48,8 @@ class Executor:
 			req_gpus = len(task.requested_resources['gpus'])
 			req_mem  = task.requested_resources['memory']
 
-			used_util = usage['cpu_utilization_percent']
-			used_mem  = usage['resident_memory_bytes']
+			used_util = usage.cpu_utilization_percent
+			used_mem  = usage.resident_memory_bytes
 			max_util  = max(req_util, used_util)
 
 			reserved_util   = reserved_util   + max_util
