@@ -52,8 +52,6 @@ import atexit
 from functools import total_ordering
 
 from pynvml import *
-import pycuda.autoinit
-import pycuda.driver as cuda
 
 gpus = []
 
@@ -87,7 +85,7 @@ def is_idle_performance_state(state):
 	compute clusters that I use, idle GPUs are put in performance state 8.
 	"""
 	assert state >= 0 and state <= 15
-	return state <= 2
+	return state > 2
 
 def initializeGPUInfo():
 	for i in range(nvmlDeviceGetCount()):
@@ -99,14 +97,14 @@ def initializeGPUInfo():
 				dev.compute_capability_minor)
 
 		gpus.append({
-			'handle':                 handle,
-			'name':                   nvmlDeviceGetName(handle),
-			'compute_capability':     cc,
-			'total_memory_bytes':     mem_info.total,
-			'free_memory_bytes':      mem_info.free,
-			'available_memory_bytes': mem_info.available,
-			'performance_state':      perf_state,
-			'is_idle':                is_idle_performance_state(perf_state)
+			'handle':             handle,
+			'name':               nvmlDeviceGetName(handle),
+			'compute_capability': cc,
+			'total_memory_bytes': mem_info.total,
+			'free_memory_bytes':  mem_info.free,
+			'used_memory_bytes':  mem_info.used,
+			'performance_state':  perf_state,
+			'is_idle':            is_idle_performance_state(perf_state)
 		})
 
 def updateGPUInfo():
@@ -121,8 +119,12 @@ def updateGPUInfo():
 		gpu['is_idle']                = is_idle_performance_state(perf_state)
 
 try:
+	import pycuda.autoinit
+	import pycuda.driver as cuda
+
 	nvmlInit()
-except NVMLError_LibraryNotFound:
-	initializeGPUInfo()
+except (NVMLError_LibraryNotFound, ImportError):
+	pass
 else:
-	atexit.register(nvmlShutdown())
+	initializeGPUInfo()
+	atexit.register(nvmlShutdown)
