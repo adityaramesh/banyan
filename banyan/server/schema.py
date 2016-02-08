@@ -32,14 +32,28 @@ resource_info = {
 		'default': '128 MiB'
 	},
 
-	# Setting this value to 100 means that the scheduler will only run this task on an idle
-	# core (with analogous interpretations for 200, 300, etc.). A value of 250, for instance,
-	# would mean that the scheduler would only run this task if there are two idle cores, and a
-	# core with around 50% or less utilization.
-	'cpu_utilization_percent': {
-		'type': 'float',
-		'min': 0,
-		'default': 0
+	# The scheduler on the worker will only run the associated task if
+	# 	max(count, percent / 100 * available_cores)
+	# cores are available. If both values are zero, then the scheduler will run the job under
+	# the following constraints are met:
+	# 	1. There is at least one core not reserved by any task.
+	# 	2. The other constraints are met.
+	'cpu_cores': {
+		'type': 'dict',
+		'schema': {
+			'count': {
+				'type': 'integer',
+				'min': 0,
+				'default': 0
+			},
+
+			'percent': {
+				'type': 'float',
+				'min': 0,
+				'max': 100,
+				'default': 0
+			}
+		}
 	},
 
 	'gpus': {

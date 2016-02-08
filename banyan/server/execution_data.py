@@ -9,8 +9,8 @@ Utilities for updating the execution data associated with a task.
 
 from flask import current_app as app
 from eve.utils import config
-from mongo_common import find_by_id, update_by_id
 
+from mongo_common import find_by_id, update_by_id
 from validation import BulkUpdateValidator
 
 class ExecutionDataValidator(BulkUpdateValidator):

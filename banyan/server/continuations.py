@@ -12,8 +12,8 @@ request handlers to ensure that access to resources is synchronized as needed. S
 """
 
 from eve.utils import config
-from mongo_common import find_by_id, update_by_id
 
+from mongo_common import find_by_id, update_by_id
 from validation import BulkUpdateValidator
 
 class AddContinuationValidator(BulkUpdateValidator):
