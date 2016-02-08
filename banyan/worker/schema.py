@@ -8,49 +8,35 @@ Schema for dictionaries like the ones used for configuration.
 """
 
 """
-By default, Banyan will attempt to consume all resources available on the system. Restrictions on
-resource usage depend on accurate information being supplied by the user in the
-``requested_resources`` field for each task.
+By default, Banyan will attempt to consume all resources available on the system. The dict validated
+using this schema is used to place restrictions on resource consumption.
 """
-settings_schema = {
-	'cpu_utilization': {
-		'type': 'dict',
-		'schema': {
-			# We can view CPU utilization as a resource, where the total amount
-			# available is given by 100 times the number of available GPUs. This field
-			# restricts the cumulative CPU utilization of our processes on this worker.
-			'max_usage_percent': {
-				'type': 'float',
-				'min': 0,
-				'max': 100,
-				'default': 100
-			},
-
-			# Percentage of CPU cycles that should be left available for others.
-			'min_reserved_percent': {
-				'type': 'float',
-				'min': 0,
-				'default': 0
-			}
-		}
-	},
-
+usage_limits_schema = {
 	'memory': {
 		'type': 'dict',
 		'schema': {
 			# Restricts percentage of total memory that can be used.
-			'max_usage_percent': {
+			'min_unused_percent': {
 				'type': 'float',
 				'min': 0,
-				'max': 100,
-				'default': 100
+				'max': 100
 			},
 
-			# How much memory should be left available for others.
-			'min_reserved_bytes': {
+			# Amount of memory that should be left available for others to use.
+			'min_unused_bytes': {
 				'type': 'integer',
-				'min': 0,
-				'default': 0
+				'min': 0
+			}
+		}
+	},
+
+	'cores': {
+		'type': 'dict',
+		'schema': {
+			# Number of cores that should be left available for others to use.
+			'min_unused_count': {
+				'type': 'integer',
+				'min': 0
 			}
 		}
 	},
@@ -58,11 +44,10 @@ settings_schema = {
 	'gpus': {
 		'type': 'dict',
 		'schema': {
-			# Specifies how many GPUs should be left for others to use.
-			'min_reserved': {
+			# Number of cores that should be left available for others to use.
+			'min_unused_count': {
 				'type': 'integer',
-				'min': 0,
-				'default': 0
+				'min': 0
 			}
 		}
 	}
