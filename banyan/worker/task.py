@@ -20,8 +20,33 @@ from psutil import Process
 from banyan.worker.resource_info import ResourceSummary
 from banyan.server.constants import memory_regex
 
-ResourceUsage = namedtuple('ResourceUsage', ['resident_memory_bytes', 'virtual_memory_bytes',
-	'cpu_utilization_percent'])
+class ResourceUsage:
+	def __init__(self, resident_memory_bytes=0, virtual_memory_bytes=0,
+		cpu_utilization_percent=0.):
+
+		self.resident_memory_bytes = resident_memory_bytes
+		self.virtual_memory_bytes = virtual_memory_bytes
+		self.cpu_utilization_percent = cpu_utilization_percent
+
+	def __add__(self, other):
+		return ResourceUsage(
+			resident_memory_bytes=self.resident_memory_bytes +
+				other.resident_memory_bytes,
+			virtual_memory_bytes=self.virtual_memory_bytes +
+				other.virtual_memory_bytes,
+			cpu_utilization_percent=self.cpu_utilization_percent +
+				other.cpu_utilization_percent,
+		)
+
+	def __str__(self):
+		TupleRep = namedtuple('ResourceUsage', ['resident_memory_bytes',
+			'virtual_memory_bytes', 'cpu_utilization_percent'])
+
+		return str(TupleRep(
+			resident_memory_bytes=self.resident_memory_bytes,
+			virtual_memory_bytes=self.virtual_memory_bytes,
+			cpu_utilization_percent=self.cpu_utilization_percent
+		))
 
 def parse_memory_string(mem_str):
 	"""
@@ -63,9 +88,9 @@ def reserved_resources(requested_resources, resource_set):
 	min_core_ratio = requested_resources['cpu_cores']['percent'] / 100
 	gpus           = len(requested_resources['gpus'])
 
-	total_mem   = resource_set['memory_bytes']
-	total_cores = resource_set['cpu_cores']
-	total_gpus  = resource_set['gpus']
+	total_mem   = resource_set.memory_bytes
+	total_cores = resource_set.cpu_cores
+	total_gpus  = resource_set.gpus
 
 	"""
 	We should have only claimed this job if sufficient resources exist on this system.

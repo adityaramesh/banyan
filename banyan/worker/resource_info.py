@@ -55,7 +55,24 @@ def get_usage_limits():
 	return usage_limits
 
 usage_limits = get_usage_limits()
-ResourceSummary = namedtuple('ResourceSummary', ['memory_bytes', 'cpu_cores', 'gpus'])
+
+class ResourceSummary:
+	def __init__(self, memory_bytes=0, cpu_cores=0, gpus=0):
+		self.memory_bytes = memory_bytes
+		self.cpu_cores = cpu_cores
+		self.gpus = gpus
+
+	def __add__(self, other):
+		return ResourceSummary(
+			memory_bytes=self.memory_bytes + other.memory_bytes,
+			cpu_cores=self.cpu_cores + other.cpu_cores,
+			gpus=self.gpus + other.gpus
+		)
+
+	def __str__(self):
+		TupleRep = namedtuple('ResourceUsage', ['memory_bytes', 'cpu_cors', 'gpus'])
+		return str(TupleRep(memory_bytes=self.memory_bytes, cpu_cores=self.cpu_cores,
+			gpus=self.gpus))
 
 def total_resources():
 	"""

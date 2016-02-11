@@ -8,6 +8,7 @@ Agent responsible for managing tasks and providing cumulative resource utilizati
 """
 
 from banyan.worker.resource_info import ResourceSummary
+from banyan.worker.task import ResourceUsage
 
 class Executor:
 	def __init__(self, resource_set):
@@ -27,6 +28,14 @@ class Executor:
 		new_running = [t for t in self.running if t.status() is None]
 		self.terminated.extend([t for t in self.running if t.status() is not None])
 		self.running = new_running
+
+	def usage(self):
+		"""
+		Returns the sum of the resources used by all running tasks.
+		"""
+
+		return sum([t.usage() for t in self.running if t.status() is None],
+			ResourceUsage())
 
 	def resources_claimed(self):
 		"""
