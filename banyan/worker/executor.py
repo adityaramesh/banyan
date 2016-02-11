@@ -79,8 +79,8 @@ class Executor:
 		would require, but the total number of reserved cpu cores and gpus should still be
 		less than the correpsonding counts in our assigned resource set.
 		"""
-		assert claimed.cpu_cores < self.resource_set.cpu_cores
-		assert claimed.gpus < self.resource_set.gpus
+		assert claimed.cpu_cores <= self.resource_set.cpu_cores
+		assert claimed.gpus <= self.resource_set.gpus
 
 		return ResourceSummary(
 			max(0, claimed.memory_bytes - self.resource_set.memory_bytes),
