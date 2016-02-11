@@ -7,62 +7,17 @@ banyan.worker.executor
 Agent responsible for managing tasks and providing cumulative resource utilization information.
 """
 
-from math import floor
-from collections import namedtuple
-
-ExecutorResourceUsage = namedtuple('ExecutorResourceUsage', [
-	'cpu_utilization_percent',
-	'cpu_cores',
-	'gpus',
-	'memory_bytes'
-])
+from banyan.worker.resource_info import ResourceSummary
 
 class Executor:
-	def __init__(self):
-		self.running = []
-		self.terminated = []
+	def __init__(self, resource_set):
+		self.resource_set = resource_set
+		self.running      = []
+		self.terminated   = []
 
 	def submit(self, task):
-		task.run()
+		task.run(self.resource_set)
 		self.running.append(task)
-
-	def usage(self):
-		"""
-		Returns the resources that we expect to be necessary in order to ensure that the
-		tasks currently running can terminate successfully, and in a reasonable amount of
-		time.
-		"""
-
-		reserved_util   = 0
-		reserved_cores  = 0
-		reserved_gpus   = 0
-		reserved_memory = 0
-
-		for task in self.running:
-			if task.status() is not None:
-				continue
-
-			usage = task.usage()
-
-			req_util = task.requested_resources['cpu_utilization_percent']
-			req_gpus = len(task.requested_resources['gpus'])
-			req_mem  = task.requested_resources['memory']
-
-			used_util = usage.cpu_utilization_percent
-			used_mem  = usage.resident_memory_bytes
-			max_util  = max(req_util, used_util)
-
-			reserved_util   = reserved_util   + max_util
-			reserved_cores  = reserved_cores  + floor(max_util)
-			reserved_gpus   = reserved_gpus   + req_gpus
-			reserved_memory = reserved_memory + max(req_mem, used_mem)
-
-		return ExecutorResourceUsage(
-			cpu_utilization_percent=reserved_util,
-			cpu_cores=reserved_cores,
-			gpus=reserved_gpus,
-			memory_bytes=reserved_memory
-		)
 
 	def poll(self):
 		"""
@@ -72,3 +27,54 @@ class Executor:
 		new_running = [t for t in self.running if t.status() is None]
 		self.terminated.extend([t for t in self.running if t.status() is not None])
 		self.running = new_running
+
+	def resources_claimed(self):
+		"""
+		Returns the resources that we expect to be necessary in order to ensure that the
+		tasks currently running can terminate successfully, and in a reasonable amount of
+		time. Generally, this means taking the maximum of the resources reserved by the
+		task, and the resources currently being consumed by the task.
+		"""
+
+		claimed_memory = 0
+		claimed_cores  = 0
+		claimed_gpus   = 0
+
+		for task in self.running:
+			if task.status() is not None:
+				continue
+
+			usage = task.usage()
+			reserved = task.reserved_resources
+
+			claimed_memory = claimed_memory + max(reserved.memory_bytes,
+				usage.resident_memory_bytes)
+			claimed_cores = claimed_cores + reserved.cpu_cores
+			claimed_gpus = claimed_gpus + reserved.gpus
+
+		return ResourceSummary(
+			memory_bytes=claimed_memory,
+			cpu_cores=claimed_cores,
+			gpus=claimed_gpus
+		)
+
+	def resources_unclaimed(self):
+		"""
+		Returns the resources in our resource set that are not being used by any processes.
+		"""
+
+		claimed = self.resources_claimed()
+
+		"""
+		It's possible for our processes to use more memory than the user indicated that they
+		would require, but the total number of reserved cpu cores and gpus should still be
+		less than the correpsonding counts in our assigned resource set.
+		"""
+		assert claimed.cpu_cores < self.resource_set.cpu_cores
+		assert claimed.gpus < self.resource_set.gpus
+
+		return ResourceSummary(
+			max(0, claimed.memory_bytes - self.resource_set.memory_bytes),
+			self.resource_set.cpu_cores - claimed.cpu_cores,
+			self.resource_set.gpus - claimed.gpus
+		)

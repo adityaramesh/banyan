@@ -75,8 +75,8 @@ def reserved_resources(requested_resources, resource_set):
 	assert gpus           <= total_gpus
 
 	return ResourceSummary(
-		total_mem=req_memory,
-		total_cores=max(min_core_count, math.ceil(min_core_ratio * total_cores)),
+		memory_bytes=req_memory,
+		cpu_cores=max(min_core_count, math.ceil(min_core_ratio * total_cores)),
 		gpus=gpus
 	)
 
