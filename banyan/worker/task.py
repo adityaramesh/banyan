@@ -14,7 +14,7 @@ from collections import namedtuple
 from datetime import datetime
 from timeit import default_timer as timer
 
-from subprocess import Popen
+from subprocess import Popen, DEVNULL
 from psutil import Process
 
 from banyan.worker.resource_info import ResourceSummary
@@ -119,7 +119,7 @@ class Task:
 		self.waiting_for_sigterm  = False
 
 	def run(self, resource_set):
-		self.proc = Popen(self.command, shell=True)
+		self.proc = Popen(self.command, shell=True, stdout=DEVNULL, stderr=DEVNULL)
 		self.proc_info = Process(self.proc.pid)
 		self.time_started = datetime.now()
 		self.reserved_resources = reserved_resources(self.requested_resources, resource_set)
