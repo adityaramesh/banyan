@@ -20,13 +20,15 @@ from psutil import Process
 from banyan.worker.resource_info import ResourceSummary
 from banyan.server.constants import memory_regex
 
-class ResourceUsage:
-	def __init__(self, resident_memory_bytes=0, virtual_memory_bytes=0,
+ResourceUsageBase = namedtuple('ResourceUsageBase', ['resident_memory_bytes', 'cpu_cores', 'gpus'])
+
+class ResourceUsage(ResourceUsageBase):
+	def __new__(cls, resident_memory_bytes=0, virtual_memory_bytes=0,
 		cpu_utilization_percent=0.):
 
-		self.resident_memory_bytes = resident_memory_bytes
-		self.virtual_memory_bytes = virtual_memory_bytes
-		self.cpu_utilization_percent = cpu_utilization_percent
+		self = super().__new__(cls, resident_memory_bytes, virtual_memory_bytes,
+			cpu_utilization_percent)
+		return self
 
 	def __add__(self, other):
 		return ResourceUsage(
@@ -37,16 +39,6 @@ class ResourceUsage:
 			cpu_utilization_percent=self.cpu_utilization_percent +
 				other.cpu_utilization_percent,
 		)
-
-	def __str__(self):
-		TupleRep = namedtuple('ResourceUsage', ['resident_memory_bytes',
-			'virtual_memory_bytes', 'cpu_utilization_percent'])
-
-		return str(TupleRep(
-			resident_memory_bytes=self.resident_memory_bytes,
-			virtual_memory_bytes=self.virtual_memory_bytes,
-			cpu_utilization_percent=self.cpu_utilization_percent
-		))
 
 def parse_memory_string(mem_str):
 	"""

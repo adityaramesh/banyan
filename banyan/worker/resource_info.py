@@ -56,11 +56,12 @@ def get_usage_limits():
 
 usage_limits = get_usage_limits()
 
-class ResourceSummary:
-	def __init__(self, memory_bytes=0, cpu_cores=0, gpus=0):
-		self.memory_bytes = memory_bytes
-		self.cpu_cores = cpu_cores
-		self.gpus = gpus
+ResourceSummaryBase = namedtuple('ResourceUsage', ['memory_bytes', 'cpu_cores', 'gpus'])
+
+class ResourceSummary(ResourceSummaryBase):
+	def __new__(cls, memory_bytes=0, cpu_cores=0, gpus=0):
+		self = super().__new__(cls, memory_bytes, cpu_cores, gpus)
+		return self
 
 	def __add__(self, other):
 		return ResourceSummary(
@@ -69,22 +70,17 @@ class ResourceSummary:
 			gpus=self.gpus + other.gpus
 		)
 
-	def __str__(self):
-		TupleRep = namedtuple('ResourceUsage', ['memory_bytes', 'cpu_cors', 'gpus'])
-		return str(TupleRep(memory_bytes=self.memory_bytes, cpu_cores=self.cpu_cores,
-			gpus=self.gpus))
-
 def total_resources():
 	"""
 	Returns the total system resources, adjusted according to the resource usage limits
 	specified in ``settings.py``.
 	"""
 
-	total_memory  = psutil.virtual_memory().total
-	min_mem_bytes = usage_limits['min_unused_bytes']
-	min_mem_ratio = usage_limits['min_unused_percent'] / 100
-	avail_memory  = max(total_memory - min_mem_bytes, total_memory -
-		math.ceil(min_mem_ratio * total_memory))
+	avail_memory  = psutil.virtual_memory().available
+	min_mem_bytes = usage_limits['memory']['min_unused_bytes']
+	min_mem_ratio = usage_limits['memory']['min_unused_percent'] / 100
+	usable_memory = max(avail_memory - min_mem_bytes, avail_memory -
+		math.ceil(min_mem_ratio * avail_memory))
 
 	total_cores = psutil.cpu_count()
 	avail_cores = max(0, total_cores - usage_limits['cores']['min_unused_count'])
@@ -92,4 +88,4 @@ def total_resources():
 	total_gpus = len(gpu_info.gpus)
 	avail_gpus = max(0, total_gpus - usage_limits['gpus']['min_unused_count'])
 
-	return ResourceSummary(memory_bytes=avail_memory, cpu_cores=avail_cores, gpus=avail_gpus)
+	return ResourceSummary(memory_bytes=usable_memory, cpu_cores=avail_cores, gpus=avail_gpus)
