@@ -8,6 +8,14 @@ Settings for the worker client program.
 """
 
 """
-XXX: If this file is blank, than Banyan will attempt to consume all resources available on the
-system. See ``banyan/worker/schema.py`` for information about how to restrict resource usage.
+XXX: If ``usage_limits`` is not declared, than Banyan will attempt to consume all resources
+available on the system. See ``banyan/worker/schema.py`` for information about how to restrict
+resource usage.
 """
+
+# How often to refresh the local task cache.
+task_cache_update_period_ms = 10 * 1000
+# How often to send updates to the server, in milliseconds.
+task_update_period = 60 * 1000
+# How often the statuses of running tasks should be polled.
+task_poll_period = 100
