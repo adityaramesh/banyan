@@ -187,13 +187,6 @@ This is the specification for the server's interface.
     - Terminated
     - Cancelled
 
-- Note: changing a task from `inactive` to `available` is not allowed. This is
-  because a task that is made available will make all of its continuations
-  available as well. It is unlikely that all of them can be made `inactive`
-  before any work-stealing occurs. It is not clear what we should do if we
-  start making continuations `inactive` and find one that has already been
-  stolen by a worker.
-
 ### Inactive to Available
 
 - Nothing special.
