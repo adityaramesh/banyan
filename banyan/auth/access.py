@@ -38,6 +38,15 @@ def make_token():
 	return ''.join(SystemRandom().choice(string.ascii_letters + string.digits + \
 		string.punctuation.replace(':', '')) for _ in range(16))
 
+def authorization_key(token):
+	"""
+	Returns the string that should be included in the 'Authorization' header in order to use the
+	given token for validation.
+	"""
+
+	username = token + ':'
+	return b64encode(username.encode()).decode('utf-8')
+
 def parse_args():
 	ap = ArgumentParser(description="Manages access privileges for users and workers.")
 	ap.add_argument('--action', type=str, choices=['add', 'remove', 'list'], required=True)
@@ -63,12 +72,16 @@ def add_user(name, token, role, db):
 	db.users.insert({'name': name, 'token': token, 'role': role})
 
 def remove_user(name, db):
+	"""
+	Note: this function should work even if the specified user does not exist in the database.
+	``test_server.py`` expects this behavior from this function.
+	"""
+
 	db.users.delete_one({'name': name})
 
 def list_users(db):
 	for u in db.users.find().sort('name', DESCENDING):
-		username = u['token'] + ':'
-		u['authorization key'] = b64encode(username.encode()).decode('utf-8')
+		u['authorization_key'] = authorization_key(u['token'])
 		pprint(u)
 
 if __name__ == '__main__':
