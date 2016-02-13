@@ -11,7 +11,8 @@ import json
 import socket
 import requests
 import unittest
-from settings import banyan_port
+
+from banyan.settings import banyan_port
 
 class EntryPoint:
 	def __init__(self):
@@ -26,12 +27,12 @@ def item_url(entry_point, resource, item):
 
 def get(entry_point, key, resource):
 	url = resource_url(entry_point, resource)
-	headers = {'Content-Type': 'application/json', 'Authorization': key}
+	headers = {'Content-Type': 'application/json', 'Authorization': 'Basic ' + key}
 	return requests.get(url, headers=headers)
 
 def post(entry_point, key, resource, item):
 	url = resource_url(entry_point, resource)
-	headers = {'Content-Type': 'application/json', 'Authorization': key}
+	headers = {'Content-Type': 'application/json', 'Authorization': 'Basic ' + key}
 
 	# If we try to format the request without converting the JSON to a
 	# string first, the requests API will pass the parameters as part of
@@ -40,7 +41,7 @@ def post(entry_point, key, resource, item):
 
 def patch(entry_point, key, resource, item, update):
 	url = item_url(entry_point, resource, item)
-	headers = {'Content-Type': 'application/json', 'Authorization': key}
+	headers = {'Content-Type': 'application/json', 'Authorization': 'Basic ' + key}
 	return requests.patch(url, headers=headers, data=json.dumps(update))
 
 def make_suite(testcase_klass, *args, **kwargs):
