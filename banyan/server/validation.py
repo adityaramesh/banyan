@@ -7,7 +7,6 @@ banyan.server.validation
 Defines custom validators for resource schema.
 """
 
-import sys
 from flask import g, current_app as app
 from eve.methods.common import serialize
 import eve.io.mongo
@@ -160,8 +159,10 @@ class ValidatorBase(eve.io.mongo.Validator):
 			common_keys = keys & special_keys
 
 			if len(common_keys) != 0:
-				self._error('update_execution_data', "The fields '{}' cannot be "
-					"changed independently of the task state.")
+				self._error('update_execution_data', "The fields {} cannot be "
+					"changed independently of the task state.".format(
+					common_keys))
+				return False
 
 		"""
 		We call the parent's `validate_update` function now, so that we can ensure that all
