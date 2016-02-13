@@ -17,6 +17,24 @@ from eve.utils import config
 from banyan.server.mongo_common import find_by_id, update_by_id
 from banyan.server.validation import BulkUpdateValidator
 
+def is_inactive(task_id, db):
+	task = find_by_id('tasks', task_id, db, ['state'])
+	return task['state'] == 'inactive'
+
+def ensure_arguments_inactive(updates, validator):
+	db = app.data.driver.db
+
+	for i, update in enumerate(updates):
+		for target in update['targets']:
+			if not is_inactive(target, db):
+				validator._error('update {}'.format(i), "Parent task '{}' is not in "
+					"'inactive' state.".format(target))
+
+		for value in update['values']:
+			if not is_inactive(value, db):
+				validator._error('update {}'.format(i), "Child task '{}' is not in "
+					"'inactive' state.".format(value))
+
 class AddContinuationValidator(BulkUpdateValidator):
 	def __init__(self, schema, resource=None, allow_unknown=False,
 		transparent_schema_rules=False):
@@ -27,7 +45,7 @@ class AddContinuationValidator(BulkUpdateValidator):
 		if not super().validate_update(updates):
 			return False
 
-		db = app.data.driver.db
+		ensure_arguments_inactive(updates, self)
 
 		"""
 		We don't perform a full cyclic dependency check, because doing so while holding a
@@ -36,13 +54,6 @@ class AddContinuationValidator(BulkUpdateValidator):
 		"""
 		for i, update in enumerate(updates):
 			targets, values = update['targets'], update['values']
-
-			for target in targets:
-				target_task = find_by_id('tasks', target, db, ['state'])
-				if target_task['state'] != 'inactive':
-					self._error('update {}'.format(i), "Parent task is not in "
-						"'inactive' state.")
-
 			if len(set(values) - set(targets)) != len(values):
 				self._error('update {}'.format(i), "Field 'values' contains ids "
 					"from 'targets'. This would cause self-loops.")
@@ -59,15 +70,7 @@ class RemoveContinuationValidator(BulkUpdateValidator):
 		if not super().validate_update(updates):
 			return False
 
-		db = app.data.driver.db
-
-		for i, update in enumerate(updates):
-			for target in update['targets']:
-				target_task = find_by_id('tasks', target, db, ['state'])
-				if target_task['state'] != 'inactive':
-					self._error('update {}'.format(i), "Parent task is not in "
-						"'inactive' state.")
-
+		ensure_arguments_inactive(updates, self)
 		return len(self._errors) == 0
 
 def acquire(child_id, db):
