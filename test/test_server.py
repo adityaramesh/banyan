@@ -288,41 +288,123 @@ class TestTaskCreation(unittest.TestCase):
 			self.assertEqual(resp.status_code, requests.codes.unprocessable_entity)
 
 	def _test_continuation_updates(self):
-		pass
-		#self.drop_tasks()
+		self.drop_tasks()
 
-		#parents = [
-		#	{'name': 'parent 1'},
-		#	{'name': 'parent 2'},
-		#	{'name': 'parent 3', 'state': 'available'}
-		#]
-		#children = [
-		#	{'name': 'child 1'},
-		#	{'name': 'child 2'},
-		#	{'name': 'child 3', 'state': 'available'}
-		#]
+		parents = [
+			{'name': 'parent 1'},
+			{'name': 'parent 2'},
+			{'name': 'parent 3', 'state': 'available'}
+		]
+		children = [
+			{'name': 'child 1'},
+			{'name': 'child 2'},
+			{'name': 'child 3', 'state': 'available'}
+		]
 
-		#parent_ids = []
-		#child_ids = []
+		parent_ids = []
+		child_ids = []
 
-		#for i, parent in enumerate(parents):
-		#	resp = post(parent, self.entry, self.cred.provider_key, 'tasks')
-		#	json = resp.json()
-		#	self.assertEqual(resp.status_code, requests.codes.created)
-		#	parent_ids.append(json['_id'])
+		for i, parent in enumerate(parents):
+			resp = post(parent, self.entry, self.cred.provider_key, 'tasks')
+			json = resp.json()
+			self.assertEqual(resp.status_code, requests.codes.created)
+			parent_ids.append(json['_id'])
 
-		#for i, child in enumerate(children):
-		#	resp = post(child, self.entry, self.cred.provider_key, 'tasks')
-		#	json = resp.json()
-		#	self.assertEqual(resp.status_code, requests.codes.created)
-		#	child_ids.append(json['_id'])
+		for i, child in enumerate(children):
+			resp = post(child, self.entry, self.cred.provider_key, 'tasks')
+			json = resp.json()
+			self.assertEqual(resp.status_code, requests.codes.created)
+			child_ids.append(json['_id'])
 
-		#
+		def add_cont_1(child_ids, parent_id, key):
+			return post(child_ids, self.entry, key, 'tasks', parent_id,
+				'add_continuations')
 
-		# TODO check all three forms of add/remove continuations virtual resource (ie both
-		# granularities)
-		# TODO check that attempting to add/remove continuations to/from a task in the
-		# 'available' state fails.
+		def add_cont_2(child_ids, parent_id, key):
+			return patch({'add_continuations': child_ids}, self.entry, key, 'tasks',
+				parent_id)
+
+		def add_cont_3(child_ids, parent_id, key):
+			return post([{'targets': [parent_id], 'values': child_ids}], self.entry,
+				key, 'tasks', 'add_continuations')
+
+		def remove_cont_1(child_ids, parent_id, key):
+			return post(child_ids, self.entry, key, 'tasks', parent_id,
+				'remove_continuations')
+
+		def remove_cont_2(child_ids, parent_id, key):
+			return patch({'remove_continuations': child_ids}, self.entry, key, 'tasks',
+				parent_id)
+
+		def remove_cont_3(child_ids, parent_id, key):
+			return post([{'targets': [parent_id], 'values': child_ids}], self.entry,
+				key, 'tasks', 'remove_continuations')
+
+		# Check that adding continuations to a parent in the 'available' state fails.
+		for child_id in child_ids:
+			for method in [add_cont_1, add_cont_2, add_cont_3]:
+				resp = method([child_id], parent_ids[2], self.cred.provider_key)
+				self.assertEqual(resp.status_code,
+					requests.codes.unprocessable_entity)
+
+		# Check that adding an 'available' continuations to any parent task fails.
+		for parent_id in parent_ids:
+			for method in [add_cont_1, add_cont_2, add_cont_3]:
+				resp = method([child_ids[2]], parent_id, self.cred.provider_key)
+				self.assertEqual(resp.status_code,
+					requests.codes.unprocessable_entity)
+
+		"""
+		Check that no continuations were added, even if the above operations failed as
+		expected.
+		"""
+		for parent_id in parent_ids:
+			resp = get(self.entry, self.cred.provider_key, 'tasks', parent_id)
+			self.assertEqual(resp.json()['continuations'], [])
+
+		"""
+		Check that adding continuations works when performed correctly.
+		"""
+
+		for parent_id in parent_ids[:2]:
+			resp = add_cont_1(child_ids[:2], parent_id, self.cred.provider_key)
+			self.assertEqual(resp.status_code, requests.codes.ok)
+
+		for child_id in child_ids[:2]:
+			resp = get(self.entry, self.cred.provider_key, 'tasks', child_id)
+			self.assertEqual(resp.json()['pending_dependency_count'], 2)
+
+		# Check that removing a nonexistent continuations fails.
+		for parent_id in parent_ids:
+			for method in [remove_cont_1, remove_cont_2, remove_cont_3]:
+				resp = method([child_ids[2]], parent_id, self.cred.provider_key)
+				self.assertEqual(resp.status_code,
+					requests.codes.unprocessable_entity)
+
+		"""
+		Check that removing a continuation from a task in the 'available' state fails.
+		"""
+
+		resp = patch({'state': 'available'}, self.entry, self.cred.provider_key, 'tasks',
+			parent_ids[1])
+		self.assertEqual(resp.status_code, requests.codes.ok)
+
+		for child_id in child_ids[:2]:
+			for method in [remove_cont_1, remove_cont_2, remove_cont_3]:
+				resp = method([child_ids[2]], parent_ids[1], self.cred.provider_key)
+				self.assertEqual(resp.status_code,
+					requests.codes.unprocessable_entity)
+
+		"""
+		Check that removing continuations works when performed correctly.
+		"""
+
+		resp = remove_cont_1(child_ids[:2], parent_ids[0], self.cred.provider_key)
+		self.assertEqual(resp.status_code, requests.codes.ok)
+
+		for child_id in child_ids[:2]:
+			resp = get(self.entry, self.cred.provider_key, 'tasks', child_id)
+			self.assertEqual(resp.json()['pending_dependency_count'], 1)
 
 if __name__ == '__main__':
 	entry = EntryPoint()
