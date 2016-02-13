@@ -103,8 +103,8 @@ def process_continuations(updates, original):
 			{'exit_status': True})
 
 		"""
-		We don't cancel the continuations on unsuccessful termination,
-		because this would defeat the purpose of the retry count.
+		We don't cancel the continuations on unsuccessful termination, because this would
+		defeat the purpose of the retry count.
 		"""
 		if data['exit_status'] != 0:
 			return
