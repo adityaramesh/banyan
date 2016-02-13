@@ -132,8 +132,8 @@ tasks = {
 	'resource_methods': ['GET', 'POST'],
 	'item_methods': ['GET', 'PATCH'],
 	'authentication': RestrictCreationToProviders,
-	'allowed_read_roles': ['user', 'worker'],
-	'allowed_write_roles': ['user', 'worker'],
+	'allowed_read_roles': ['provider', 'worker'],
+	'allowed_write_roles': ['provider', 'worker'],
 
 	'schema': {
 		# Information provided by the client.
@@ -280,7 +280,7 @@ execution_info = {
 	'authentication': TokenAuth,
 	'resource_methods': ['GET', 'POST'],
 	'item_methods': ['GET', 'PATCH'],
-	'allowed_read_roles': ['user', 'worker'],
+	'allowed_read_roles': ['provider', 'worker'],
 	'allowed_write_roles': ['worker'],
 	'schema': execution_data
 }
@@ -289,13 +289,14 @@ resource_usage = {
 	'authentication': TokenAuth,
 	'resource_methods': ['GET', 'POST'],
 	'item_methods': ['GET'],
-	'allowed_read_roles': ['user', 'worker'],
+	'allowed_read_roles': ['provider', 'worker'],
 	'allowed_write_roles': ['worker'],
 
 	'schema': {
 		'task': {
 			'type': 'objectid',
-			'data_relation': {'resource': 'tasks'}
+			'data_relation': {'resource': 'tasks'},
+			'required': True
 		},
 
 		'time': {
