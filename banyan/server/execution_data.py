@@ -44,9 +44,9 @@ class ExecutionDataValidator(BulkUpdateValidator):
 			return False
 
 		"""
-		This branch is taken if the ``execution_data`` entry for this
-		task has not been created yet. After validation, a callback
-		registered with an event hook will create a new entry.
+		This branch is taken if the ``execution_data`` entry for this task has not been
+		created yet. After validation, a callback registered with an event hook will create
+		a new entry.
 		"""
 		if 'execution_data_id' not in task:
 			return super().validate_update_content(updates)
@@ -55,10 +55,9 @@ class ExecutionDataValidator(BulkUpdateValidator):
 		target = find_by_id('execution_info', target_id, db)
 
 		"""
-		This branch is taken if the current ``execution_data`` entry
-		for this task is out of date (i.e. a worker attempted to run
-		this task before, but failed). After validation, a callback
-		registered with an event hook will create a new entry.
+		This branch is taken if the current ``execution_data`` entry for this task is out of
+		date (i.e. a worker attempted to run this task before, but failed). After
+		validation, a callback registered with an event hook will create a new entry.
 		"""
 		if target['retry_count'] != task['retry_count']:
 			return super().validate_update_content(updates)

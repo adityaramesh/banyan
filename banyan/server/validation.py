@@ -90,8 +90,8 @@ class ValidatorBase(eve.io.mongo.Validator):
 			# but we do perform a basic sanity check.
 			if '_id' in document:
 				if document['_id'] in children:
-					self._error('continuations', "Task cannot have itself "
-						"as a continuation.")
+					self._error('continuations', "Task cannot have itself as a "
+						"continuation.")
 					return False
 
 			for child in children:
@@ -164,8 +164,8 @@ class ValidatorBase(eve.io.mongo.Validator):
 					"changed independently of the task state.")
 
 		"""
-		We call the parent's `validate_update` function now, so that we
-		can ensure that all ObjectIds for continuations are valid.
+		We call the parent's `validate_update` function now, so that we can ensure that all
+		ObjectIds for continuations are valid.
 		"""
 		if not super().validate_update(document, _id, original_document):
 			return False
