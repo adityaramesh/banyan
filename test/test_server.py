@@ -7,7 +7,6 @@ test.test_server
 Tests functionality that is implemented completely on the server-side.
 """
 
-import itertools
 import unittest
 from contextlib import contextmanager
 from pymongo import MongoClient
@@ -198,13 +197,13 @@ class TestTaskCreation(unittest.TestCase):
 
 	def _test_state_updates(self):
 		self.drop_tasks()
-		
+
 		resp = post({'name': 'test'}, self.entry, self.cred.provider_key, 'tasks')
 		self.assertEqual(resp.status_code, requests.codes.created)
 
 		resp = patch({'state': 'available'}, self.entry, self.cred.provider_key, 'tasks',
 			resp.json()['_id'])
-		self.assertEqual(resp.status_code, requests.codes.ok)	
+		self.assertEqual(resp.status_code, requests.codes.ok)
 
 	def _test_resource_updates(self):
 		"""
@@ -216,8 +215,6 @@ class TestTaskCreation(unittest.TestCase):
 		3. If a task is not in the `inactive` state, then any attempt to modify the value of
 		   a ``readonly`` or ``createonly`` field should fail.
 		"""
-
-		states = ['inactive', 'available']
 
 		changes = [
 			(
@@ -257,7 +254,7 @@ class TestTaskCreation(unittest.TestCase):
 			task = dict(basic_task, **dict(init, **{'state': 'inactive'}))
 			resp = post(task, self.entry, self.cred.provider_key, 'tasks')
 			self.assertEqual(resp.status_code, requests.codes.created)
-			
+
 			resp = patch(init, self.entry, self.cred.provider_key, 'tasks',
 				resp.json()['_id'])
 			self.assertEqual(resp.status_code, requests.codes.ok)
@@ -271,7 +268,7 @@ class TestTaskCreation(unittest.TestCase):
 			task = dict(basic_task, **init)
 			resp = post(task, self.entry, self.cred.provider_key, 'tasks')
 			self.assertEqual(resp.status_code, requests.codes.created)
-			
+
 			resp = patch(final, self.entry, self.cred.provider_key, 'tasks',
 				resp.json()['_id'])
 			self.assertEqual(resp.status_code, requests.codes.ok)
@@ -285,7 +282,7 @@ class TestTaskCreation(unittest.TestCase):
 			task = dict(basic_task, **dict(init, **{'state': 'available'}))
 			resp = post(task, self.entry, self.cred.provider_key, 'tasks')
 			self.assertEqual(resp.status_code, requests.codes.created)
-			
+
 			resp = patch(final, self.entry, self.cred.provider_key, 'tasks',
 				resp.json()['_id'])
 			self.assertEqual(resp.status_code, requests.codes.unprocessable_entity)
@@ -488,6 +485,35 @@ class TestExecutionInfo(unittest.TestCase):
 			resp = update_execution_data(update)
 			self.assertEqual(resp.status_code, requests.codes.unprocessable_entity)
 
+class TestCancellation(unittest.TestCase):
+	"""
+	Verifies that the behavior of task cancellation is as expected.
+	"""
+
+	def __init__(self, entry, db, cred, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.entry = entry
+		self.db = db
+		self.cred = cred
+
+	def test_cancellation_depth_1(self):
+		"""
+		Tests cancellation on a dependency tree of depth one (i.e. parents and one level of
+		continuations). The purpose of this test is to identify obvious issues in the
+		implementation.
+		"""
+
+		pass
+
+	def test_cancellation_depth_2(self):
+		"""
+		Tests cancellation on a dependency tree of depth two (i.e. parents and one level of
+		continuations). This test is designed to identify more subtle issues in the
+		implementation.
+		"""
+
+		pass
+
 if __name__ == '__main__':
 	entry = EntryPoint()
 	db = MongoClient()['banyan']
@@ -497,4 +523,5 @@ if __name__ == '__main__':
 		suite.addTest(make_suite(TestAuthorization, entry=entry, cred=cred, db=db))
 		suite.addTest(make_suite(TestTaskCreation, entry=entry, cred=cred, db=db))
 		suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestCancellation, entry=entry, cred=cred, db=db))
 		unittest.TextTestRunner().run(suite)
