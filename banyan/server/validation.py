@@ -45,6 +45,13 @@ class ValidatorBase(eve.io.mongo.Validator):
 			transparent_schema_rules=True
 		)
 
+		"""
+		This is a hack that is necessary in order to get the base class to pass the
+		``resource`` parameter to the constructors of the validators for nested schema and
+		virtual resources.
+		"""
+		self._Validator__config['resource'] = self.resource
+
 	def validate(self, document, schema=None, update=False, context=None):
 		"""
 		Called after each POST request, e.g. when a new task is created. Also called each
@@ -154,13 +161,6 @@ class ValidatorBase(eve.io.mongo.Validator):
 			if len(common_keys) != 0:
 				self._error('update_execution_data', "The fields '{}' cannot be "
 					"changed independently of the task state.")
-
-		"""
-		This is a hack that is necessary in order to get the base class
-		to pass the `resource` parameter to the constructors of the
-		validators for the virtual resources.
-		"""
-		self._Validator__config['resource'] = self.resource
 
 		"""
 		We call the parent's `validate_update` function now, so that we
