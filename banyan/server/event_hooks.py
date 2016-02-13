@@ -160,7 +160,7 @@ def update_execution_data(updates, original):
 		data_id = original['execution_data_id']
 		update_by_id('execution_info', data_id, db, {'$set': data_updates})
 
-def acquire_lock(request, lookup):
+def acquire_lock(request):
 	lock.acquire()
 
 def release_lock(request, payload):
