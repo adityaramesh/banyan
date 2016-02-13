@@ -19,29 +19,38 @@ class EntryPoint:
 		self.ip = socket.gethostbyname(socket.gethostname())
 		self.base_url = 'http://' + self.ip + ':' + str(banyan_port)
 
-def resource_url(entry_point, resource):
-	return '/'.join([entry_point.base_url, resource])
+def make_url(entry_point, resource, item=None, virtual_subresource=None):
+	if item is None:
+		return '/'.join([entry_point.base_url, resource])
+	if virtual_subresource is None:
+		return '/'.join([entry_point.base_url, resource, item])
+	return '/'.join([entry_point.base_url, resource, item, virtual_subresource])
 
-def item_url(entry_point, resource, item):
-	return '/'.join([entry_point.base_url, resource, item])
+def get(entry_point, key, resource, item=None):
+	url = make_url(entry_point, resource, item)
+	headers = {'Content-Type': 'application/json'}
+	if key:
+		headers['Authorization'] = 'Basic ' + key
 
-def get(entry_point, key, resource):
-	url = resource_url(entry_point, resource)
-	headers = {'Content-Type': 'application/json', 'Authorization': 'Basic ' + key}
 	return requests.get(url, headers=headers)
 
-def post(entry_point, key, resource, item):
-	url = resource_url(entry_point, resource)
-	headers = {'Content-Type': 'application/json', 'Authorization': 'Basic ' + key}
+def post(doc, entry_point, key, resource, item=None, virtual_subresource=None):
+	url = make_url(entry_point, resource, item, virtual_subresource)
+	headers = {'Content-Type': 'application/json'}
+	if key:
+		headers['Authorization'] = 'Basic ' + key
 
 	# If we try to format the request without converting the JSON to a
 	# string first, the requests API will pass the parameters as part of
 	# the URL. As a result, nested JSON will not get encoded correctly.
-	return requests.post(url, headers=headers, data=json.dumps(item))
+	return requests.post(url, headers=headers, data=json.dumps(doc))
 
-def patch(entry_point, key, resource, item, update):
-	url = item_url(entry_point, resource, item)
-	headers = {'Content-Type': 'application/json', 'Authorization': 'Basic ' + key}
+def patch(update, entry_point, key, resource, item):
+	url = make_url(entry_point, resource, item)
+	headers = {'Content-Type': 'application/json'}
+	if key:
+		headers['Authorization'] = 'Basic ' + key
+
 	return requests.patch(url, headers=headers, data=json.dumps(update))
 
 def make_suite(testcase_klass, *args, **kwargs):
