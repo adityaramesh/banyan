@@ -8,7 +8,7 @@ Configuration settings for Eve.
 """
 
 import os
-from banyan.server.schema import tasks, memory_usage, cpu_usage, gpu_usage
+from banyan.server.schema import tasks, execution_info, resource_usage
 
 # XXX: remove after testing.
 DEBUG = True
@@ -27,7 +27,6 @@ HATEOAS  = False
 
 DOMAIN = {
 	'tasks': tasks,
-	'memory_usage': memory_usage,
-	'cpu_usage': cpu_usage,
-	'gpu_usage': gpu_usage
+	'execution_info': execution_info,
+	'resource_usage': resource_usage
 }
