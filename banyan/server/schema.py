@@ -411,6 +411,7 @@ virtual_resources = {
 
 		'remove_continuations': {
 			'granularity': ['resource', 'item'],
+			'validator': continuations.RemoveContinuationValidator,
 			'on_update': continuations.make_removals,
 			'synchronize': True,
 

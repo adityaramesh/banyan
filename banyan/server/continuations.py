@@ -11,6 +11,7 @@ request handlers to ensure that access to resources is synchronized as needed. S
 `specification.md` for details about when synchronization is necessary.
 """
 
+from flask import current_app as app
 from eve.utils import config
 
 from banyan.server.mongo_common import find_by_id, update_by_id
@@ -26,6 +27,8 @@ class AddContinuationValidator(BulkUpdateValidator):
 		if not super().validate_update(updates):
 			return False
 
+		db = app.data.driver.db
+
 		"""
 		We don't perform a full cyclic dependency check, because doing so while holding a
 		lock could cause severe performance degradations. But even in the case that a cyclic
@@ -33,9 +36,37 @@ class AddContinuationValidator(BulkUpdateValidator):
 		"""
 		for i, update in enumerate(updates):
 			targets, values = update['targets'], update['values']
+
+			for target in targets:
+				target_task = find_by_id('tasks', target, db, ['state'])
+				if target_task['state'] != 'inactive':
+					self._error('update {}'.format(i), "Parent task is not in "
+						"'inactive' state.")
+
 			if len(set(values) - set(targets)) != len(values):
-				self._error('update {}'.format(i), "Field 'values' contains ids from "
-					"'targets'. This would cause self-loops.")
+				self._error('update {}'.format(i), "Field 'values' contains ids "
+					"from 'targets'. This would cause self-loops.")
+
+		return len(self._errors) == 0
+
+class RemoveContinuationValidator(BulkUpdateValidator):
+	def __init__(self, schema, resource=None, allow_unknown=False,
+		transparent_schema_rules=False):
+
+		super().__init__(schema, resource)
+
+	def validate_update(self, updates):
+		if not super().validate_update(updates):
+			return False
+
+		db = app.data.driver.db
+
+		for i, update in enumerate(updates):
+			for target in update['targets']:
+				target_task = find_by_id('tasks', target, db, ['state'])
+				if target_task['state'] != 'inactive':
+					self._error('update {}'.format(i), "Parent task is not in "
+						"'inactive' state.")
 
 		return len(self._errors) == 0
 
@@ -162,7 +193,10 @@ def make_additions(updates, db):
 
 	for update in updates:
 		for parent in update['targets']:
-			cur = find_by_id('tasks', parent, db, ['continuations'])['continuations']
+			parent_task = find_by_id('tasks', parent, db, ['state', 'continuations'])
+			assert parent_task['state'] == 'inactive'
+
+			cur = parent_task['continuations']
 			new = list(set(update['values']) - set(cur))
 
 			if len(new) != 0:
@@ -183,7 +217,9 @@ def make_removals(updates, db):
 
 	for update in updates:
 		for parent in update['targets']:
-			cur = find_by_id('tasks', parent, db, ['continuations'])['continuations']
+			parent_task = find_by_id('tasks', parent, db, ['state', 'continuations'])
+			assert parent_task['state'] == 'inactive'
+
 			rm = list(set(update['values']) & set(cur))
 
 			if len(rm) != 0:
