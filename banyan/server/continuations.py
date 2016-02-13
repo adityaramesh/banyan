@@ -223,6 +223,7 @@ def make_removals(updates, db):
 			parent_task = find_by_id('tasks', parent, db, ['state', 'continuations'])
 			assert parent_task['state'] == 'inactive'
 
+			cur = parent_task['continuations']
 			rm = list(set(update['values']) & set(cur))
 
 			if len(rm) != 0:
