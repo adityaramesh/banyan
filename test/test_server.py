@@ -25,11 +25,14 @@ class Credentials():
 		self.db = db
 		self.revoke()
 
+		self.provider_name = 'test_provider'
 		self.provider_token = access.make_token()
+
+		self.worker_name = 'test_worker'
 		self.worker_token = access.make_token()
 
-		access.add_user('test_provider', self.provider_token, 'provider', self.db)
-		access.add_user('test_worker', self.worker_token, 'worker', self.db)
+		access.add_user(self.provider_name, self.provider_token, 'provider', self.db)
+		access.add_user(self.worker_name, self.worker_token, 'worker', self.db)
 
 		self.provider_key = access.authorization_key(self.provider_token)
 		self.worker_key = access.authorization_key(self.worker_token)
@@ -370,6 +373,9 @@ class TestTaskCreation(unittest.TestCase):
 			resp = add_cont_1(child_ids[:2], parent_id, self.cred.provider_key)
 			self.assertEqual(resp.status_code, requests.codes.ok)
 
+			resp = get(self.entry, self.cred.provider_key, 'tasks', parent_id)
+			self.assertEqual(len(resp.json()['continuations']), 2)
+
 		for child_id in child_ids[:2]:
 			resp = get(self.entry, self.cred.provider_key, 'tasks', child_id)
 			self.assertEqual(resp.json()['pending_dependency_count'], 2)
@@ -402,9 +408,85 @@ class TestTaskCreation(unittest.TestCase):
 		resp = remove_cont_1(child_ids[:2], parent_ids[0], self.cred.provider_key)
 		self.assertEqual(resp.status_code, requests.codes.ok)
 
+		resp = get(self.entry, self.cred.provider_key, 'tasks', parent_ids[0])
+		self.assertEqual(len(resp.json()['continuations']), 0)
+
 		for child_id in child_ids[:2]:
 			resp = get(self.entry, self.cred.provider_key, 'tasks', child_id)
 			self.assertEqual(resp.json()['pending_dependency_count'], 1)
+
+class TestExecutionInfo(unittest.TestCase):
+	"""
+	Tests the behavior of the ``execution_data`` endpoint.
+	"""
+
+	def __init__(self, entry, db, cred, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.entry = entry
+		self.db = db
+		self.cred = cred
+
+	def test_updates(self):
+		tasks = [
+			{'name': 'task 1', 'command': 'foo', 'requested_resources': {}},
+			# Should automatically terminate, so claiming this task should fail.
+			{'name': 'task 2', 'state': 'available'},
+			{'name': 'task 3', 'command': 'foo', 'state': 'available',
+				'requested_resources': {}}
+		]
+		task_ids = []
+
+		for task in tasks:
+			resp = post(task, self.entry, self.cred.provider_key, 'tasks')
+			self.assertEqual(resp.status_code, requests.codes.created)
+			task_ids.append(resp.json()['_id'])
+
+		def claim_task(task_id):
+			update = {
+				'state': 'running',
+				'update_execution_data': {
+					'worker': self.cred.worker_name
+				}
+			}
+			return patch(update, self.entry, self.cred.worker_key, 'tasks', task_id)
+
+		# Test that claiming a task in the wrong state fails.
+		for task_id in task_ids[:2]:
+			resp = claim_task(task_id)
+			self.assertEqual(resp.status_code, requests.codes.unprocessable_entity)
+
+		# Test that claiming tasks works when performed correctly.
+		resp = claim_task(task_ids[2])
+		self.assertEqual(resp.status_code, requests.codes.ok)
+
+		"""
+		Test that attempting to modify a readonly or createonly field of an instance of
+		``execution_data`` fails.
+		"""
+
+		good_updates = [
+			{'time_started': 'Tue, 02 Apr 2013 10:29:13 GMT'}
+		]
+
+		bad_updates = [
+			{'task': task_ids[0]},
+			{'retry_count': 2},
+			{'worker': ''},
+			{'exit_status': 0},
+			{'time_terminated': 'Tue, 02 Apr 2013 10:29:13 GMT'}
+		]
+
+		def update_execution_data(update):
+			return patch({'update_execution_data': update}, self.entry,
+				self.cred.worker_key, 'tasks', task_ids[2])
+
+		for update in good_updates:
+			resp = update_execution_data(update)
+			self.assertEqual(resp.status_code, requests.codes.ok)
+
+		for update in bad_updates:
+			resp = update_execution_data(update)
+			self.assertEqual(resp.status_code, requests.codes.unprocessable_entity)
 
 if __name__ == '__main__':
 	entry = EntryPoint()
@@ -414,4 +496,5 @@ if __name__ == '__main__':
 	with scoped_credentials(db) as cred:
 		suite.addTest(make_suite(TestAuthorization, entry=entry, cred=cred, db=db))
 		suite.addTest(make_suite(TestTaskCreation, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
 		unittest.TextTestRunner().run(suite)
