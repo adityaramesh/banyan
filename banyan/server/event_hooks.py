@@ -43,9 +43,8 @@ def acquire_continuations(items):
 
 def filter_virtual_resources(updates, original):
 	"""
-	Filters out updates to virtual resources and moves them to an external
-	dictionary that is used after Eve performs the updates to the physical
-	resources.
+	Filters out updates to virtual resources and moves them to an external dictionary that is
+	used after Eve performs the updates to the physical resources.
 	"""
 
 	g.virtual_resource_updates = {}
@@ -57,8 +56,7 @@ def filter_virtual_resources(updates, original):
 
 def modify_state_changes(updates, original):
 	"""
-	Converts task state changes requested by users to the actual changes
-	that need to be made.
+	Converts task state changes requested by users to the actual changes that need to be made.
 	"""
 
 	assert g.token is not None
@@ -73,10 +71,9 @@ def modify_state_changes(updates, original):
 def process_continuations(updates, original):
 	"""
 	Does the following two things:
-	- Applies updates for ``add_continuations`` and
-	  ``remove_continuations`` virtual resources.
-	- Releases and cancels child continuations of task after it is
-	  terminated or cancelled.
+
+	- Applies updates for ``add_continuations`` and ``remove_continuations`` virtual resources.
+	- Releases and cancels child continuations of task after it is terminated or cancelled.
 	"""
 
 	db = app.data.driver.db
@@ -117,20 +114,20 @@ def process_continuations(updates, original):
 
 def update_execution_data(updates, original):
 	"""
-	If a task is set to 'running' *for the first time*, then the following
-	changes are made:
+	If a task is set to 'running' *for the first time*, then the following changes are made:
+
 	- The retry count is incremented.
 	- A new instance of execution data is inserted into `execution_info`,
 	  along with the fields specified in `update_execution_data`.
 
-	If a task is set to 'terminated' and its retry count is less than its
-	maximum retry count, then the following changes are made:
+	If a task is set to 'terminated' and its retry count is less than its maximum retry count,
+	then the following changes are made:
+
 	- The retry count is incremented.
 	- The state of the task is set to `available`.
 	- A new instance of execution data is inserted into `execution_info`.
 
-	Otherwise, the changes given in `update_execution_data` are applied
-	independently.
+	Otherwise, the changes given in `update_execution_data` are applied independently.
 	"""
 
 	db = app.data.driver.db
