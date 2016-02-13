@@ -102,12 +102,13 @@ execution_data = {
 	'worker': {
 		'type': 'string',
 		'maxlength': max_name_string_length,
-		'readonly': True
+		'empty': False,
+		'createonly': True
 	},
 
-	'exit_status': {'type': 'integer', 'readonly': True},
-	'time_started': {'type': 'datetime', 'readonly': True},
-	'time_terminated': {'type': 'datetime', 'readonly': True}
+	'exit_status': {'type': 'integer', 'createonly': True},
+	'time_started': {'type': 'datetime', 'createonly': True},
+	'time_terminated': {'type': 'datetime', 'createonly': True}
 }
 
 tasks = {
