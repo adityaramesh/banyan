@@ -7,6 +7,7 @@ banyan.server.validation
 Defines custom validators for resource schema.
 """
 
+import sys
 from flask import g, current_app as app
 from eve.methods.common import serialize
 import eve.io.mongo
@@ -291,8 +292,17 @@ class BulkUpdateValidator(ValidatorBase):
 			if len(invalid_keys) != 0:
 				cur_issues.append("Invalid keys '{}'.".format(invalid_keys))
 
+			targets, values = update['targets'], update['values']
+			if not isinstance(targets, list):
+				cur_issues.append("'targets' field must be a list.")
+			if not isinstance(values, list) and not isinstance(values, dict):
+				cur_issues.append("'values' field must be a list or a dict.")
+
 			if len(cur_issues) > 0:
 				self._error('update {}'.format(i), str(cur_issues))
+
+		if len(self._errors) != 0:
+			return False
 
 		for i, update in enumerate(updates):
 			# TODO: fill in default fields for the schema.
@@ -305,7 +315,7 @@ class BulkUpdateValidator(ValidatorBase):
 			"""
 			updates[i] = serialize(update, schema=self.schema)
 
-		return len(self._errors) == 0
+		return True
 
 	def validate_update_content(self, updates, original_ids=None, original_documents=None):
 		assert (original_ids and original_documents) or \
