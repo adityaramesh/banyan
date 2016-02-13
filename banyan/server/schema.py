@@ -82,26 +82,9 @@ resource_info = {
 }
 
 """
-TODO: if we add a schema for overall resource usage reported by workers, then include the following
-comments for each GPU: ::
-
-	# The following two fields are obtained from ``nvmlDeviceGetutilizationRates``.
-
-	'utilization_percent': {
-		'type': 'float',
-		'required': True,
-		'min': 0,
-		'max': 100
-	},
-
-	'memory_access_percent': {
-		'type': 'float',
-		'required': True,
-		'min': 0,
-		'max': 100
-	}
+All fields are marked 'readonly`, because they can only be modified via the 'update_execution_info'
+virtual resource of the 'tasks' endpoint.
 """
-
 execution_data = {
 	'task': {
 		'type': 'objectid',
@@ -119,12 +102,12 @@ execution_data = {
 	'worker': {
 		'type': 'string',
 		'maxlength': max_name_string_length,
-		'createonly': True
+		'readonly': True
 	},
 
-	'exit_status': {'type': 'integer', 'createonly': True},
-	'time_started': {'type': 'datetime', 'createonly': True},
-	'time_terminated': {'type': 'datetime', 'createonly': True}
+	'exit_status': {'type': 'integer', 'readonly': True},
+	'time_started': {'type': 'datetime', 'readonly': True},
+	'time_terminated': {'type': 'datetime', 'readonly': True}
 }
 
 tasks = {
@@ -149,7 +132,6 @@ tasks = {
 		'name': {
 			'type': 'string',
 			'maxlength': max_name_string_length,
-			'empty': False,
 			'unique': True,
 			'mutable_iff_inactive': True
 		},
@@ -281,7 +263,7 @@ execution_info = {
 	'resource_methods': ['GET', 'POST'],
 	'item_methods': ['GET', 'PATCH'],
 	'allowed_read_roles': ['provider', 'worker'],
-	'allowed_write_roles': ['worker'],
+	'allowed_write_roles': [],
 	'schema': execution_data
 }
 
