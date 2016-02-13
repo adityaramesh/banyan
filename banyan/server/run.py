@@ -15,6 +15,7 @@ import os
 import sys
 sys.path.insert(1, os.path.join(sys.path[0], '../..'))
 
+from banyan.settings import banyan_port
 from banyan.server.validation import Validator
 from banyan.server.virtual_blueprints import blueprints
 import banyan.server.event_hooks as event_hooks
@@ -29,4 +30,4 @@ if __name__ == '__main__':
 	for blueprint in blueprints:
 		app.register_blueprint(blueprint)
 
-	app.run(host=get_public_ip(), port=5000)
+	app.run(host=get_public_ip(), port=banyan_port)
