@@ -500,6 +500,15 @@ class TestCancellation(unittest.TestCase):
 		self.db = db
 		self.cred = cred
 
+	def _insert_tasks(self, tasks, id_list):
+		for task in tasks:
+			resp = post(task, self.entry, self.cred.provider_key, 'tasks')
+			id_list.append(resp.json()['_id'])
+
+	def _add_continuations(self, child_ids, parent_id, key):
+		return post(child_ids, self.entry, key, 'tasks', parent_id,
+			'add_continuations')
+
 	def test_cancellation_depth_1(self):
 		"""
 		Tests cancellation on a dependency tree of depth one (i.e. parents and one level of
@@ -522,20 +531,11 @@ class TestCancellation(unittest.TestCase):
 		parent_ids = []
 		child_ids = []
 
-		def insert_tasks(tasks, id_list):
-			for task in tasks:
-				resp = post(task, self.entry, self.cred.provider_key, 'tasks')
-				id_list.append(resp.json()['_id'])
-
-		insert_tasks(parents, parent_ids)
-		insert_tasks(children, child_ids)
-
-		def add_continuations(child_ids, parent_id, key):
-			return post(child_ids, self.entry, key, 'tasks', parent_id,
-				'add_continuations')
+		self._insert_tasks(parents, parent_ids)
+		self._insert_tasks(children, child_ids)
 
 		for parent_id in parent_ids:
-			resp = add_continuations(child_ids, parent_id, self.cred.provider_key)
+			resp = self._add_continuations(child_ids, parent_id, self.cred.provider_key)
 			self.assertEqual(resp.status_code, requests.codes.ok)
 
 		resp = patch({'state': 'cancelled'}, self.entry, self.cred.provider_key, 'tasks',
@@ -544,6 +544,7 @@ class TestCancellation(unittest.TestCase):
 
 		for child_id in child_ids:
 			resp = get(self.entry, self.cred.provider_key, 'tasks', child_id)
+			self.assertEqual(resp.json()['state'], 'cancelled')
 			self.assertEqual(resp.json()['pending_dependency_count'], 2)
 
 		"""
@@ -562,9 +563,84 @@ class TestCancellation(unittest.TestCase):
 		"""
 
 		drop_tasks(db)
-		# TODO after the continuations are called, remember to check that the bottommost
-		# continuations are also removed from the continuation lists of the top
-		# continuations
+
+		parents = [
+			{'name': 'parent 1'},
+			{'name': 'parent 2'}
+		]
+
+		children = [
+			{'name': 'child 1'},
+			{'name': 'child 2'}
+		]
+
+		grandchildren = [
+			{'name': 'grandchild 1'},
+			{'name': 'grandchild 2'},
+			{'name': 'grandchild 3'},
+			{'name': 'grandchild 4'}
+		]
+
+		parent_ids = []
+		child_ids = []
+		grandchild_ids = []
+
+		self._insert_tasks(parents, parent_ids)
+		self._insert_tasks(children, child_ids)
+		self._insert_tasks(grandchildren, grandchild_ids)
+
+		"""
+		Construct the tree of tasks, and verify that the continuation lists and dependency
+		counts are as we expect.
+		"""
+
+		for parent_id in parent_ids:
+			resp = self._add_continuations(child_ids, parent_id, self.cred.provider_key)
+			self.assertEqual(resp.status_code, requests.codes.ok)
+
+		for child_id in child_ids:
+			resp = self._add_continuations(grandchild_ids, child_id,
+				self.cred.provider_key)
+			self.assertEqual(resp.status_code, requests.codes.ok)
+
+		for parent_id in parent_ids:
+			resp = get(self.entry, self.cred.provider_key, 'tasks', parent_id)
+			self.assertEqual(len(resp.json()['continuations']), 2)
+
+		for child_id in child_ids:
+			resp = get(self.entry, self.cred.provider_key, 'tasks', child_id)
+			self.assertEqual(len(resp.json()['continuations']), 4)
+			self.assertEqual(resp.json()['pending_dependency_count'], 2)
+
+		for grandchild_id in grandchild_ids:
+			resp = get(self.entry, self.cred.provider_key, 'tasks', grandchild_id)
+			self.assertEqual(len(resp.json()['continuations']), 0)
+			self.assertEqual(resp.json()['pending_dependency_count'], 2)
+
+		"""
+		Now we cancel just one parent, and verify that **all** continuations were cancelled
+		and removed from any continuation lists that mention them.
+		"""
+
+		resp = patch({'state': 'cancelled'}, self.entry, self.cred.provider_key, 'tasks',
+			parent_ids[0])
+		self.assertEqual(resp.status_code, requests.codes.ok)
+
+		for parent_id in parent_ids:
+			resp = get(self.entry, self.cred.provider_key, 'tasks', parent_id)
+			self.assertEqual(len(resp.json()['continuations']), 0)
+
+		for child_id in child_ids:
+			resp = get(self.entry, self.cred.provider_key, 'tasks', child_id)
+			self.assertEqual(resp.json()['state'], 'cancelled')
+			self.assertEqual(resp.json()['pending_dependency_count'], 2)
+			self.assertEqual(len(resp.json()['continuations']), 0)
+
+		for grandchild_id in grandchild_ids:
+			resp = get(self.entry, self.cred.provider_key, 'tasks', grandchild_id)
+			self.assertEqual(resp.json()['state'], 'cancelled')
+			self.assertEqual(resp.json()['pending_dependency_count'], 2)
+			self.assertEqual(len(resp.json()['continuations']), 0)
 
 if __name__ == '__main__':
 	entry = EntryPoint()
@@ -572,8 +648,8 @@ if __name__ == '__main__':
 	suite = unittest.TestSuite()
 
 	with scoped_credentials(db) as cred:
-		suite.addTest(make_suite(TestAuthorization, entry=entry, cred=cred, db=db))
-		suite.addTest(make_suite(TestTaskCreation, entry=entry, cred=cred, db=db))
-		suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
+		#suite.addTest(make_suite(TestAuthorization, entry=entry, cred=cred, db=db))
+		#suite.addTest(make_suite(TestTaskCreation, entry=entry, cred=cred, db=db))
+		#suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
 		suite.addTest(make_suite(TestCancellation, entry=entry, cred=cred, db=db))
 		unittest.TextTestRunner().run(suite)
