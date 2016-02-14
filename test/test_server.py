@@ -102,7 +102,7 @@ class TestTaskCreation(unittest.TestCase):
 		self._test_creation_with_continuations()
 
 	def _test_creation_without_continuations(self):
-		drop_tasks(db)
+		drop_tasks(self.db)
 
 		ops = [
 			(
@@ -161,7 +161,7 @@ class TestTaskCreation(unittest.TestCase):
 			self.assertEqual(resp.status_code, expected_status)
 
 	def _test_creation_with_continuations(self):
-		drop_tasks(db)
+		drop_tasks(self.db)
 
 		parents = []
 		children = [
@@ -196,7 +196,7 @@ class TestTaskCreation(unittest.TestCase):
 		self._test_continuation_updates()
 
 	def _test_state_updates(self):
-		drop_tasks(db)
+		drop_tasks(self.db)
 
 		resp = post({'name': 'test'}, self.entry, self.cred.provider_key, 'tasks')
 		self.assertEqual(resp.status_code, requests.codes.created)
@@ -216,7 +216,7 @@ class TestTaskCreation(unittest.TestCase):
 		   a ``readonly`` or ``createonly`` field should fail.
 		"""
 
-		drop_tasks(db)
+		drop_tasks(self.db)
 
 		changes = [
 			(
@@ -233,8 +233,8 @@ class TestTaskCreation(unittest.TestCase):
 					'cpu_cores': {'count': 1}}}
 			),
 			(
-				{'max_termination_time': '10 minutes'},
-				{'max_termination_time': '20 minutes'}
+				{'max_shutdown_time': '10 minutes'},
+				{'max_shutdown_time': '20 minutes'}
 			),
 			(
 				{'max_retry_count': 1},
@@ -290,17 +290,49 @@ class TestTaskCreation(unittest.TestCase):
 			self.assertEqual(resp.status_code, requests.codes.unprocessable_entity)
 
 	def _test_continuation_updates(self):
-		drop_tasks(db)
+		drop_tasks(self.db)
+
+		"""
+		The tasks below can't be empty; otherwise, they will automatically be terminated
+		when they are set to 'available', and our tests won't work. So we provide bogus
+		commands.
+		"""
 
 		parents = [
-			{'name': 'parent 1'},
-			{'name': 'parent 2'},
-			{'name': 'parent 3', 'state': 'available'}
+			{
+				'name': 'parent 1',
+				'command': 'ls',
+				'requested_resources': {}
+			},
+			{
+				'name': 'parent 2',
+				'command': 'ls',
+				'requested_resources': {}
+			},
+			{
+				'name': 'parent 3',
+				'command': 'ls',
+				'state': 'available',
+				'requested_resources': {}
+			}
 		]
 		children = [
-			{'name': 'child 1'},
-			{'name': 'child 2'},
-			{'name': 'child 3', 'state': 'available'}
+			{
+				'name': 'child 1',
+				'command': 'ls',
+				'requested_resources': {}
+			},
+			{
+				'name': 'child 2',
+				'command': 'ls',
+				'requested_resources': {}
+			},
+			{
+				'name': 'child 3',
+				'command': 'ls',
+				'state': 'available',
+				'requested_resources': {}
+			}
 		]
 
 		parent_ids = []
@@ -426,7 +458,7 @@ class TestExecutionInfo(unittest.TestCase):
 		self.cred = cred
 
 	def test_updates(self):
-		drop_tasks(db)
+		drop_tasks(self.db)
 
 		tasks = [
 			{'name': 'task 1', 'command': 'foo', 'requested_resources': {}},
@@ -505,8 +537,8 @@ class TestCancellation(unittest.TestCase):
 			resp = post(task, self.entry, self.cred.provider_key, 'tasks')
 			id_list.append(resp.json()['_id'])
 
-	def _add_continuations(self, child_ids, parent_id, key):
-		return post(child_ids, self.entry, key, 'tasks', parent_id,
+	def _add_continuations(self, child_ids, parent_id):
+		return post(child_ids, self.entry, self.cred.provider_key, 'tasks', parent_id,
 			'add_continuations')
 
 	def test_cancellation_depth_1(self):
@@ -516,7 +548,7 @@ class TestCancellation(unittest.TestCase):
 		implementation.
 		"""
 
-		drop_tasks(db)
+		drop_tasks(self.db)
 
 		parents = [
 			{'name': 'parent 1'},
@@ -535,7 +567,7 @@ class TestCancellation(unittest.TestCase):
 		self._insert_tasks(children, child_ids)
 
 		for parent_id in parent_ids:
-			resp = self._add_continuations(child_ids, parent_id, self.cred.provider_key)
+			resp = self._add_continuations(child_ids, parent_id)
 			self.assertEqual(resp.status_code, requests.codes.ok)
 
 		resp = patch({'state': 'cancelled'}, self.entry, self.cred.provider_key, 'tasks',
@@ -562,7 +594,7 @@ class TestCancellation(unittest.TestCase):
 		implementation.
 		"""
 
-		drop_tasks(db)
+		drop_tasks(self.db)
 
 		parents = [
 			{'name': 'parent 1'},
@@ -595,12 +627,11 @@ class TestCancellation(unittest.TestCase):
 		"""
 
 		for parent_id in parent_ids:
-			resp = self._add_continuations(child_ids, parent_id, self.cred.provider_key)
+			resp = self._add_continuations(child_ids, parent_id)
 			self.assertEqual(resp.status_code, requests.codes.ok)
 
 		for child_id in child_ids:
-			resp = self._add_continuations(grandchild_ids, child_id,
-				self.cred.provider_key)
+			resp = self._add_continuations(grandchild_ids, child_id)
 			self.assertEqual(resp.status_code, requests.codes.ok)
 
 		for parent_id in parent_ids:
@@ -642,14 +673,186 @@ class TestCancellation(unittest.TestCase):
 			self.assertEqual(resp.json()['pending_dependency_count'], 2)
 			self.assertEqual(len(resp.json()['continuations']), 0)
 
+class TestTermination(unittest.TestCase):
+	"""
+	Verifies that the behavior of task termination is as expected.
+	"""
+
+	def __init__(self, entry, db, cred, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.entry = entry
+		self.db = db
+		self.cred = cred
+
+	def _insert_tasks(self, tasks, id_list):
+		for task in tasks:
+			resp = post(task, self.entry, self.cred.provider_key, 'tasks')
+			id_list.append(resp.json()['_id'])
+
+	def _add_continuations(self, child_ids, parent_id):
+		return post(child_ids, self.entry, self.cred.provider_key, 'tasks', parent_id,
+			'add_continuations')
+
+	def test_empty_task_termination(self):
+		drop_tasks(self.db)
+
+		parents = [{'name': 'parent 1'}]
+		children = [
+			{'name': 'child 1'},
+			{'name': 'child 2'}
+		]
+
+		parent_ids = []
+		child_ids = []
+
+		self._insert_tasks(parents, parent_ids)
+		self._insert_tasks(children, child_ids)
+		self._add_continuations(child_ids, parent_ids[0])
+
+		resp = patch({'state': 'available'}, self.entry, self.cred.provider_key, 'tasks',
+			parent_ids[0])
+		self.assertEqual(resp.status_code, requests.codes.ok)
+
+		resp = get(self.entry, self.cred.provider_key, 'tasks', parent_ids[0])
+		self.assertEqual(resp.json()['state'], 'terminated')
+		self.assertEqual(len(resp.json()['continuations']), 2)
+
+		for child_id in child_ids:
+			resp = get(self.entry, self.cred.provider_key, 'tasks', child_id)
+			self.assertEqual(resp.json()['state'], 'available')
+			self.assertEqual(resp.json()['pending_dependency_count'], 0)
+
+	def test_normal_task_termination(self):
+		drop_tasks(self.db)
+
+		parents = [{
+			'name': 'parent 1',
+			'command': 'ls',
+			'requested_resources': {}
+		}]
+		children = [
+			{'name': 'child 1'},
+			{'name': 'child 2'}
+		]
+
+		parent_ids = []
+		child_ids = []
+
+		self._insert_tasks(parents, parent_ids)
+		self._insert_tasks(children, child_ids)
+		self._add_continuations(child_ids, parent_ids[0])
+
+		"""
+		To terminate the task, we have to have the worker first claim the task, then
+		terminate it.
+		"""
+
+		claim_update = {
+			'state': 'running',
+			'update_execution_data': {'worker': self.cred.worker_name}
+		}
+		term_update = {
+			'state': 'terminated',
+			'update_execution_data': {
+				'exit_status': 0,
+				'time_terminated': 'Tue, 02 Apr 2013 10:29:13 GMT'
+			}
+		}
+
+		resp = patch({'state': 'available'}, self.entry, self.cred.provider_key, 'tasks',
+			parent_ids[0])
+		self.assertEqual(resp.status_code, requests.codes.ok)
+
+		resp = patch(claim_update, self.entry, self.cred.worker_key, 'tasks', parent_ids[0])
+		self.assertEqual(resp.status_code, requests.codes.ok)
+
+		resp = patch(term_update, self.entry, self.cred.worker_key, 'tasks', parent_ids[0])
+		self.assertEqual(resp.status_code, requests.codes.ok)
+
+		resp = get(self.entry, self.cred.provider_key, 'tasks', parent_ids[0])
+		self.assertEqual(resp.json()['state'], 'terminated')
+		self.assertEqual(len(resp.json()['continuations']), 2)
+
+		for child_id in child_ids:
+			resp = get(self.entry, self.cred.provider_key, 'tasks', child_id)
+			self.assertEqual(resp.json()['state'], 'available')
+			self.assertEqual(resp.json()['pending_dependency_count'], 0)
+
+	def test_retry_on_unsuccessful_termination(self):
+		drop_tasks(self.db)
+
+		parents = [{
+			'name': 'task',
+			'command': 'ls',
+			'requested_resources': {},
+			'max_retry_count': 3
+		}]
+		children = [
+			{'name': 'child 1'},
+			{'name': 'child 2'}
+		]
+
+		parent_ids = []
+		child_ids = []
+
+		self._insert_tasks(parents, parent_ids)
+		self._insert_tasks(children, child_ids)
+		self._add_continuations(child_ids, parent_ids[0])
+
+		claim_update = {
+			'state': 'running',
+			'update_execution_data': {'worker': self.cred.worker_name}
+		}
+		term_update = {
+			'state': 'terminated',
+			'update_execution_data': {
+				'exit_status': 1,
+				'time_terminated': 'Tue, 02 Apr 2013 10:29:13 GMT'
+			}
+		}
+		old_data_id = None
+
+		resp = patch({'state': 'available'}, self.entry, self.cred.provider_key, 'tasks',
+			parent_ids[0])
+		self.assertEqual(resp.status_code, requests.codes.ok)
+
+		resp = patch(claim_update, self.entry, self.cred.worker_key, 'tasks', parent_ids[0])
+		self.assertEqual(resp.status_code, requests.codes.ok)
+
+		if old_data_id is not None:
+			resp = get(self.entry, self.cred.provider_key, 'tasks', parent_ids[0])
+			self.assertEqual(resp.status_code, requests.codes.ok)
+			new_data_id = resp.json()['execution_data_id']
+
+			self.assertNotEqual(old_data_id, new_data_id)
+			old_data_id = new_data_id
+
+		resp = patch(term_update, self.entry, self.cred.worker_key, 'tasks', parent_ids[0])
+		self.assertEqual(resp.status_code, requests.codes.ok)
+
+		resp = get(self.entry, self.cred.provider_key, 'tasks', parent_ids[0])
+		#pprint(resp.json())
+		#self.assertEqual(resp.status_code, requests.codes.ok)
+		#self.assertEqual(resp.json()['state'], 'available')
+
+		# TODO check continuations
+
+		# TODO put above in loop
+
+		# TODO check that after three times, the task isn't made available anymore
+
+class TestCancellationTerminationInteraction(unittest.TestCase):
+	pass
+
 if __name__ == '__main__':
 	entry = EntryPoint()
 	db = MongoClient()['banyan']
 	suite = unittest.TestSuite()
 
 	with scoped_credentials(db) as cred:
-		#suite.addTest(make_suite(TestAuthorization, entry=entry, cred=cred, db=db))
-		#suite.addTest(make_suite(TestTaskCreation, entry=entry, cred=cred, db=db))
-		#suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestAuthorization, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestTaskCreation, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
 		suite.addTest(make_suite(TestCancellation, entry=entry, cred=cred, db=db))
+		#suite.addTest(make_suite(TestTermination, entry=entry, cred=cred, db=db))
 		unittest.TextTestRunner().run(suite)

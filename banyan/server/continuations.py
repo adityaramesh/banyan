@@ -114,7 +114,7 @@ def release(child_id, db):
 		})
 	else:
 		update_by_id('tasks', child_id, db, {
-			'$dec': {'pending_dependency_count': 1},
+			'$inc': {'pending_dependency_count': -1},
 			'$currentDate': {config.LAST_UPDATED: True}
 		})
 
