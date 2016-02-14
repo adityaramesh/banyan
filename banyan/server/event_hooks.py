@@ -74,7 +74,16 @@ def modify_state_changes(request, lookup):
 
 	updates['state'] = 'pending_cancellation'
 
-def terminate_empty_tasks(items):
+def terminate_empty_tasks(items, original=None):
+	"""
+	The second argument is set to ``None`` by default so that this function can be registered
+	with both ``on_insert_tasks`` and ``on_update_tasks``.
+	"""
+
+	# If this function is called by ``on_update_tasks``, then ``items`` will be a dict.
+	if isinstance(items, dict):
+		items = [items]
+
 	for item in items:
 		if 'command' not in item and item['state'] == 'available':
 			item['state'] = 'terminated'
@@ -138,15 +147,17 @@ def process_continuations(updates, original):
 		for x in cont_list:
 			continuations.cancel(x, db)
 	elif updates['state'] == 'terminated':
-		data = find_by_id('execution_info', original['execution_data_id'], db,
-			{'exit_status': True})
+		# This branch won't be taken if the task is empty (i.e. has no command).
+		if 'execution_data_id' in original:
+			data = find_by_id('execution_info', original['execution_data_id'], db,
+				{'exit_status': True})
 
-		"""
-		We don't cancel the continuations on unsuccessful termination, because this would
-		defeat the purpose of the retry count.
-		"""
-		if data['exit_status'] != 0:
-			return
+			"""
+			We don't cancel the continuations on unsuccessful termination, because this
+			would defeat the purpose of the retry count.
+			"""
+			if data['exit_status'] != 0:
+				return
 
 		for x in cont_list:
 			continuations.release(x, db)
@@ -207,6 +218,7 @@ def register(app):
 	app.on_insert_tasks   += terminate_empty_tasks
 	app.on_inserted_tasks += acquire_continuations
 
+	app.on_update_tasks  += terminate_empty_tasks
 	app.on_update_tasks  += filter_virtual_resources
 	app.on_updated_tasks += process_continuations
 	app.on_updated_tasks += update_execution_data
