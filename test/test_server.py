@@ -102,7 +102,7 @@ class TestTaskCreation(unittest.TestCase):
 		self._test_creation_with_continuations()
 
 	def _test_creation_without_continuations(self):
-		self.drop_tasks()
+		drop_tasks(db)
 
 		ops = [
 			(
@@ -161,7 +161,7 @@ class TestTaskCreation(unittest.TestCase):
 			self.assertEqual(resp.status_code, expected_status)
 
 	def _test_creation_with_continuations(self):
-		self.drop_tasks()
+		drop_tasks(db)
 
 		parents = []
 		children = [
@@ -196,7 +196,7 @@ class TestTaskCreation(unittest.TestCase):
 		self._test_continuation_updates()
 
 	def _test_state_updates(self):
-		self.drop_tasks()
+		drop_tasks(db)
 
 		resp = post({'name': 'test'}, self.entry, self.cred.provider_key, 'tasks')
 		self.assertEqual(resp.status_code, requests.codes.created)
@@ -215,6 +215,8 @@ class TestTaskCreation(unittest.TestCase):
 		3. If a task is not in the `inactive` state, then any attempt to modify the value of
 		   a ``readonly`` or ``createonly`` field should fail.
 		"""
+
+		drop_tasks(db)
 
 		changes = [
 			(
@@ -288,7 +290,7 @@ class TestTaskCreation(unittest.TestCase):
 			self.assertEqual(resp.status_code, requests.codes.unprocessable_entity)
 
 	def _test_continuation_updates(self):
-		self.drop_tasks()
+		drop_tasks(db)
 
 		parents = [
 			{'name': 'parent 1'},
@@ -424,6 +426,8 @@ class TestExecutionInfo(unittest.TestCase):
 		self.cred = cred
 
 	def test_updates(self):
+		drop_tasks(db)
+
 		tasks = [
 			{'name': 'task 1', 'command': 'foo', 'requested_resources': {}},
 			# Should automatically terminate, so claiming this task should fail.
@@ -503,7 +507,52 @@ class TestCancellation(unittest.TestCase):
 		implementation.
 		"""
 
-		pass
+		drop_tasks(db)
+
+		parents = [
+			{'name': 'parent 1'},
+			{'name': 'parent 2'}
+		]
+
+		children = [
+			{'name': 'child 1'},
+			{'name': 'child 2'}
+		]
+
+		parent_ids = []
+		child_ids = []
+
+		def insert_tasks(tasks, id_list):
+			for task in tasks:
+				resp = post(task, self.entry, self.cred.provider_key, 'tasks')
+				id_list.append(resp.json()['_id'])
+
+		insert_tasks(parents, parent_ids)
+		insert_tasks(children, child_ids)
+
+		def add_continuations(child_ids, parent_id, key):
+			return post(child_ids, self.entry, key, 'tasks', parent_id,
+				'add_continuations')
+
+		for parent_id in parent_ids:
+			resp = add_continuations(child_ids, parent_id, self.cred.provider_key)
+			self.assertEqual(resp.status_code, requests.codes.ok)
+
+		resp = patch({'state': 'cancelled'}, self.entry, self.cred.provider_key, 'tasks',
+			parent_ids[0])
+		self.assertEqual(resp.status_code, requests.codes.ok)
+
+		for child_id in child_ids:
+			resp = get(self.entry, self.cred.provider_key, 'tasks', child_id)
+			self.assertEqual(resp.json()['pending_dependency_count'], 2)
+
+		"""
+		Check that the cancelled continuations were removed from all lists that mention
+		them.
+		"""
+		for parent_id in parent_ids:
+			resp = get(self.entry, self.cred.provider_key, 'tasks', parent_id)
+			self.assertEqual(resp.json()['continuations'], [])
 
 	def test_cancellation_depth_2(self):
 		"""
@@ -512,7 +561,10 @@ class TestCancellation(unittest.TestCase):
 		implementation.
 		"""
 
-		pass
+		drop_tasks(db)
+		# TODO after the continuations are called, remember to check that the bottommost
+		# continuations are also removed from the continuation lists of the top
+		# continuations
 
 if __name__ == '__main__':
 	entry = EntryPoint()
