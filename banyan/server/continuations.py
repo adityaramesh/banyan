@@ -177,7 +177,7 @@ def cancel(task_id, db, assert_inactive=False):
 
 	if assert_inactive:
 		task = find_by_id('tasks', task_id, db, {'continuations': True, 'state': True})
-		assert task['state'] == 'inactive'
+		assert task['state'] == 'inactive' or task['state'] == 'cancelled'
 	else:
 		task = find_by_id('tasks', task_id, db, {'continuations': True})
 
