@@ -17,6 +17,9 @@ from banyan.server.schema import virtual_resources
 from banyan.server.mongo_common import find_by_id, update_by_id
 import banyan.server.continuations as continuations
 
+# XXX
+import sys
+
 item_level_virtual_resources = set()
 for parent_res, virtuals in virtual_resources.items():
 	for virtual_res, schema in virtuals.items():
@@ -82,7 +85,10 @@ def terminate_empty_tasks(items, original=None):
 
 	# If this function is called by ``on_update_tasks``, then ``items`` will be a dict.
 	if isinstance(items, dict):
-		items = [items]
+		if 'command' not in items and 'command' not in original and \
+			items['state'] == 'available':
+			items['state'] = 'terminated'
+		return
 
 	for item in items:
 		if 'command' not in item and item['state'] == 'available':
@@ -149,14 +155,11 @@ def process_continuations(updates, original):
 	elif updates['state'] == 'terminated':
 		# This branch won't be taken if the task is empty (i.e. has no command).
 		if 'execution_data_id' in original:
-			data = find_by_id('execution_info', original['execution_data_id'], db,
-				{'exit_status': True})
-
 			"""
 			We don't cancel the continuations on unsuccessful termination, because this
 			would defeat the purpose of the retry count.
 			"""
-			if data['exit_status'] != 0:
+			if g.virtual_resource_updates['update_execution_data']['exit_status'] != 0:
 				return
 
 		for x in cont_list:
@@ -201,7 +204,13 @@ def update_execution_data(updates, original):
 			return
 
 		if updates['state'] == 'terminated' and retry_count < max_retry_count:
-			update_by_id('tasks', id_, db, {'$inc': {'retry_count': 1}})
+			if data_updates is None:
+				assert 'command' not in original
+			elif data_updates['exit_status'] != 0:
+				update_by_id('tasks', id_, db, {
+					'$set': {'state': 'available'},
+					'$inc': {'retry_count': 1}
+				})
 
 	if data_updates:
 		data_id = original['execution_data_id']
