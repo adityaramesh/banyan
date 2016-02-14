@@ -149,7 +149,7 @@ class ValidatorBase(eve.io.mongo.Validator):
 				if not self.validate_state_change(sf, document,
 						required_fields={'worker'}):
 					return False
-			elif sf in ['cancelled', 'terminated']:
+			elif sf == 'terminated' or (sf == 'cancelled' and role == 'worker'):
 				if not self.validate_state_change(sf, document,
 						required_fields={'exit_status', 'time_terminated'}):
 					return False

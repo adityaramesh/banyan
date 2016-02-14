@@ -8,14 +8,13 @@ Defines legal state transitions for API users.
 """
 
 legal_provider_transitions = {
-	'inactive':             ['pending_cancellation', 'available'],
+	'inactive':             ['cancelled', 'available'],
+	'available':            ['cancelled'],
 
-	# Note: when a user attempts to change the state of a task to `cancelled`, the server first
-	# puts the task in the `pending_cancellation` state, and then goes through the procedures
-	# described in the specification.
-	'available':            ['pending_cancellation'],
+	# Note: when a user attempts to change the state of a running task to `cancelled`, the
+	# server first puts the task in the `pending_cancellation` state, and then goes through the
+	# procedures described in the specification.
 	'running':              ['pending_cancellation'],
-
 	'pending_cancellation': [],
 	'cancelled':            [],
 	'terminated':           []

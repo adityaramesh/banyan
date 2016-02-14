@@ -7,10 +7,12 @@ banyan.server.event_hooks
 Provides the event hooks that implement the server-side functionality.
 """
 
+from bson import ObjectId
 from flask import g, current_app as app
 from eve.utils import config
 
 from banyan.server.lock import lock
+from banyan.server.state import legal_provider_transitions
 from banyan.server.schema import virtual_resources
 from banyan.server.mongo_common import find_by_id, update_by_id
 import banyan.server.continuations as continuations
@@ -57,9 +59,20 @@ def modify_state_changes(request, lookup):
 
 	if 'state' not in updates:
 		return
+	if not (g.user['role'] == 'provider' and updates['state'] == 'cancelled'):
+		return
+	if config.ID_FIELD not in lookup:
+		return
 
-	if g.user['role'] == 'provider' and updates['state'] == 'cancelled':
-		updates['state'] = 'pending_cancellation'
+	db = app.data.driver.db
+	task = find_by_id('tasks', ObjectId(lookup[config.ID_FIELD]), db, {'state': True})
+
+	if not task:
+		return
+	if 'cancelled' in legal_provider_transitions[task['state']]:
+		return
+
+	updates['state'] = 'pending_cancellation'
 
 def terminate_empty_tasks(items):
 	for item in items:
