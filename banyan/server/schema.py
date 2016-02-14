@@ -205,7 +205,7 @@ tasks = {
 
 		# The amount of time a worker will wait for a task to terminate after sending it
 		# SIGTERM before resorting to using SIGKILL.
-		'max_termination_time': {
+		'max_shutdown_time': {
 			'type': 'string',
 			'regex': time_regex,
 			'maxlength': max_time_string_length,
