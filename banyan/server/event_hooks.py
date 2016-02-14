@@ -21,6 +21,46 @@ for parent_res, virtuals in virtual_resources.items():
 		if 'item' in schema['granularity']:
 			item_level_virtual_resources.add(virtual_res)
 
+def acquire_lock(request):
+	lock.acquire()
+
+def release_lock(request, payload):
+	lock.release()
+
+def acquire_lock_if_necessary(request, lookup):
+	if not request.json:
+		return
+
+	synchronized_fields = ['state', 'add_continuations', 'remove_continuations']
+
+	for field in synchronized_fields:
+		if field in request.json:
+			lock.acquire()
+			g.lock_owner = True
+			return
+
+	g.lock_owner = False
+
+def release_lock_if_necessary(request, payload):
+	if g.lock_owner:
+		assert lock.locked()
+		lock.release()
+
+def modify_state_changes(request, lookup):
+	"""
+	Converts task state changes requested by users to the actual changes that need to be made.
+	"""
+
+	assert g.token is not None
+	assert g.user is not None
+	updates = request.json
+
+	if 'state' not in updates:
+		return
+
+	if g.user['role'] == 'provider' and updates['state'] == 'cancelled':
+		updates['state'] = 'pending_cancellation'
+
 def terminate_empty_tasks(items):
 	for item in items:
 		if 'command' not in item and item['state'] == 'available':
@@ -53,20 +93,6 @@ def filter_virtual_resources(updates, original):
 		if virtual_resource in updates:
 			g.virtual_resource_updates[virtual_resource] = updates[virtual_resource]
 			updates.pop(virtual_resource)
-
-def modify_state_changes(updates, original):
-	"""
-	Converts task state changes requested by users to the actual changes that need to be made.
-	"""
-
-	assert g.token is not None
-	assert g.user is not None
-
-	if 'state' not in updates:
-		return
-
-	if g.user['role'] == 'provider' and updates['state'] == 'cancelled':
-		updates['state'] = 'pending_cancellation'
 
 def process_continuations(updates, original):
 	"""
@@ -157,44 +183,17 @@ def update_execution_data(updates, original):
 		data_id = original['execution_data_id']
 		update_by_id('execution_info', data_id, db, {'$set': data_updates})
 
-def acquire_lock(request):
-	lock.acquire()
-
-def release_lock(request, payload):
-	lock.release()
-
-def acquire_lock_if_necessary(request, lookup):
-	if not request.json:
-		return
-
-	synchronized_fields = ['state', 'add_continuations', 'remove_continuations']
-
-	for field in synchronized_fields:
-		if field in request.json:
-			lock.acquire()
-			g.lock_owner = True
-			return
-
-	g.lock_owner = False
-
-def release_lock_if_necessary(request, payload):
-	if g.lock_owner:
-		assert lock.locked()
-		lock.release()
-
 def register(app):
 	app.on_pre_POST_tasks  += acquire_lock
 	app.on_post_POST_tasks += release_lock
 
 	app.on_pre_PATCH_tasks  += acquire_lock_if_necessary
+	app.on_pre_PATCH_tasks  += modify_state_changes
 	app.on_post_PATCH_tasks += release_lock_if_necessary
 
-	# Event hooks for insertion.
 	app.on_insert_tasks   += terminate_empty_tasks
 	app.on_inserted_tasks += acquire_continuations
 
-	# Event hooks for updates.
 	app.on_update_tasks  += filter_virtual_resources
-	app.on_update_tasks  += modify_state_changes
 	app.on_updated_tasks += process_continuations
 	app.on_updated_tasks += update_execution_data
