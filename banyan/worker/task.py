@@ -40,30 +40,6 @@ class ResourceUsage(ResourceUsageBase):
 				other.cpu_utilization_percent,
 		)
 
-def parse_memory_string(mem_str):
-	"""
-	Returns the number of bytes represented by a string matching the regex described by
-	``banyan.server.constants.memory_regex``.
-	"""
-
-	mem_pat = re.compile(memory_regex)
-	m = mem_pat.match(mem_str)
-
-	assert m is not None
-	assert len(m.groups()) == 2
-
-	base = int(m.groups()[0])
-	scale = {
-		'byte':  1,
-		'bytes': 1,
-		'KiB':   2 ** 10,
-		'MiB':   2 ** 20,
-		'GiB':   2 ** 30,
-		'TiB':   2 ** 40
-	}[m.groups()[1]]
-
-	return base * scale
-
 def reserved_resources(requested_resources, resource_set):
 	"""
 	Given the ``requested_resources`` field associated with a given task, this function
@@ -75,7 +51,7 @@ def reserved_resources(requested_resources, resource_set):
 		resource_set: Subset of system resources that we are allowed to use.
 	"""
 
-	req_memory     = parse_memory_string(requested_resources['memory'])
+	req_memory     = requested_resources['memory_bytes']
 	min_core_count = requested_resources['cpu_cores']['count']
 	min_core_ratio = requested_resources['cpu_cores']['percent'] / 100
 	gpus           = len(requested_resources['gpus'])
@@ -98,17 +74,17 @@ def reserved_resources(requested_resources, resource_set):
 	)
 
 class Task:
-	def __init__(self, command, requested_resources, estimated_runtime, max_termination_time):
+	def __init__(self, command, requested_resources, estimated_runtime, max_shutdown_time):
 		assert command is not None
 		assert isinstance(command, str)
 		assert isinstance(estimated_runtime, float)
-		assert isinstance(max_termination_time, float)
+		assert isinstance(max_shutdown_time, float)
 
-		self.command              = command
-		self.requested_resources  = requested_resources
-		self.estimated_runtime    = estimated_runtime
-		self.max_termination_time = max_termination_time
-		self.waiting_for_sigterm  = False
+		self.command             = command
+		self.requested_resources = requested_resources
+		self.estimated_runtime   = estimated_runtime
+		self.max_shutdown_time   = max_shutdown_time
+		self.waiting_for_sigterm = False
 
 	def run(self, resource_set):
 		self.proc = Popen(self.command, shell=True, stdout=DEVNULL, stderr=DEVNULL)
@@ -138,7 +114,7 @@ class Task:
 		if not self.waiting_for_sigterm:
 			return
 
-		if timer() - self.sigterm_start > self.max_termination_time:
+		if timer() - self.sigterm_start > self.max_shutdown_time:
 			self.proc.kill()
 			self.waiting_for_sigterm = False
 
