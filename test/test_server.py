@@ -904,7 +904,6 @@ class TestTermination(unittest.TestCase):
 		resp = get(self.entry, self.cred.provider_key, 'tasks', child_ids[0])
 		self.assertEqual(resp.json()['state'], 'terminated')
 		
-
 # TODO test for filter and projection queries using requested_resources
 
 if __name__ == '__main__':
