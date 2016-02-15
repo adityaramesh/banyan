@@ -799,10 +799,15 @@ class TestTermination(unittest.TestCase):
 		self._insert_tasks(children, child_ids)
 		self._add_continuations(child_ids, parent_ids[0])
 
+		resp = patch({'state': 'available'}, self.entry, self.cred.provider_key, 'tasks',
+			parent_ids[0])
+		self.assertEqual(resp.status_code, requests.codes.ok)
+
 		claim_update = {
 			'state': 'running',
 			'update_execution_data': {'worker': self.cred.worker_name}
 		}
+
 		term_update = {
 			'state': 'terminated',
 			'update_execution_data': {
@@ -810,36 +815,51 @@ class TestTermination(unittest.TestCase):
 				'time_terminated': 'Tue, 02 Apr 2013 10:29:13 GMT'
 			}
 		}
+
 		old_data_id = None
 
-		resp = patch({'state': 'available'}, self.entry, self.cred.provider_key, 'tasks',
-			parent_ids[0])
-		self.assertEqual(resp.status_code, requests.codes.ok)
+		for _ in range(3):
+			resp = patch(claim_update, self.entry, self.cred.worker_key, 'tasks',
+				parent_ids[0])
+			self.assertEqual(resp.status_code, requests.codes.ok)
+
+			resp = get(self.entry, self.cred.provider_key, 'tasks', parent_ids[0])
+			self.assertEqual(resp.status_code, requests.codes.ok)
+
+			if old_data_id is not None:
+				new_data_id = resp.json()['execution_data_id']
+				self.assertNotEqual(old_data_id, new_data_id)
+				old_data_id = new_data_id
+			else:
+				old_data_id = resp.json()['execution_data_id']
+
+			resp = patch(term_update, self.entry, self.cred.worker_key, 'tasks',
+				parent_ids[0])
+			self.assertEqual(resp.status_code, requests.codes.ok)
+
+			resp = get(self.entry, self.cred.provider_key, 'tasks', parent_ids[0])
+			self.assertEqual(resp.status_code, requests.codes.ok)
+			self.assertEqual(resp.json()['state'], 'available')
+
+			for child_id in child_ids:
+				resp = get(self.entry, self.cred.provider_key, 'tasks', child_id)
+				self.assertEqual(resp.json()['state'], 'inactive')
+				self.assertEqual(resp.json()['pending_dependency_count'], 1)
+
+		"""
+		Ensure that, after the max retry count is reached, the task will no longer be made
+		available on unsuccessful termination.
+		"""
 
 		resp = patch(claim_update, self.entry, self.cred.worker_key, 'tasks', parent_ids[0])
 		self.assertEqual(resp.status_code, requests.codes.ok)
-
-		if old_data_id is not None:
-			resp = get(self.entry, self.cred.provider_key, 'tasks', parent_ids[0])
-			self.assertEqual(resp.status_code, requests.codes.ok)
-			new_data_id = resp.json()['execution_data_id']
-
-			self.assertNotEqual(old_data_id, new_data_id)
-			old_data_id = new_data_id
 
 		resp = patch(term_update, self.entry, self.cred.worker_key, 'tasks', parent_ids[0])
 		self.assertEqual(resp.status_code, requests.codes.ok)
 
 		resp = get(self.entry, self.cred.provider_key, 'tasks', parent_ids[0])
-		#pprint(resp.json())
-		#self.assertEqual(resp.status_code, requests.codes.ok)
-		#self.assertEqual(resp.json()['state'], 'available')
-
-		# TODO check continuations
-
-		# TODO put above in loop
-
-		# TODO check that after three times, the task isn't made available anymore
+		self.assertEqual(resp.status_code, requests.codes.ok)
+		self.assertEqual(resp.json()['state'], 'terminated')
 
 class TestCancellationTerminationInteraction(unittest.TestCase):
 	pass
@@ -854,5 +874,5 @@ if __name__ == '__main__':
 		suite.addTest(make_suite(TestTaskCreation, entry=entry, cred=cred, db=db))
 		suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
 		suite.addTest(make_suite(TestCancellation, entry=entry, cred=cred, db=db))
-		#suite.addTest(make_suite(TestTermination, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestTermination, entry=entry, cred=cred, db=db))
 		unittest.TextTestRunner().run(suite)
