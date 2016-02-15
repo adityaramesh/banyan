@@ -198,18 +198,22 @@ def update_execution_data(updates, original):
 			data_id = db.execution_info.insert(new_data)
 
 			update_by_id('tasks', id_, db, {
-				'$inc': {'retry_count': 1},
-				'$set': {'execution_data_id': data_id}
+				'$set': {'retry_count': 1, 'execution_data_id': data_id}
 			})
 			return
 
-		if updates['state'] == 'terminated' and retry_count < max_retry_count:
-			if data_updates is None:
-				assert 'command' not in original
-			elif data_updates['exit_status'] != 0:
+		if updates['state'] == 'terminated' and retry_count <= max_retry_count:
+			if data_updates is None or data_updates['exit_status'] == 0:
+				pass
+			else:
+				update_by_id('execution_info', original['execution_data_id'], db,
+					{'$set': data_updates})
+				new_data = {'task': id_, 'retry_count': retry_count + 1}
+				data_id = db.execution_info.insert(new_data)
+
 				update_by_id('tasks', id_, db, {
-					'$set': {'state': 'available'},
-					'$inc': {'retry_count': 1}
+					'$inc': {'retry_count': 1},
+					'$set': {'state': 'available', 'execution_data_id': data_id}
 				})
 
 	if data_updates:
