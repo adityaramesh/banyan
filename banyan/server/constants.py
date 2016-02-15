@@ -34,9 +34,3 @@ max_name_string_length = 256
 max_command_string_length = 1024
 
 default_max_retry_count = 0
-
-memory_regex = r'^(0|[1-9][0-9]*) (byte|bytes|KiB|MiB|GiB|TiB)'
-max_memory_string_length = 32
-
-time_regex = r'[1-9][0-9]*(.[0-9]*)? (second|minute|hour)s?'
-max_time_string_length = 32

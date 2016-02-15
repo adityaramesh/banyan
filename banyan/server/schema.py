@@ -25,11 +25,10 @@ Used by the user to indicate the resources that are expected to be consumed by a
 course of its execution.
 """
 resource_info = {
-	'memory': {
-		'type': 'string',
-		'regex': memory_regex,
-		'maxlength': max_memory_string_length,
-		'default': '128 MiB'
+	'memory_bytes': {
+		'type': 'integer',
+		'min': 0,
+		'default': 128 * 2 ** 20
 	},
 
 	# The scheduler on the worker will only run the associated task if
@@ -62,18 +61,21 @@ resource_info = {
 		'schema': {
 			'type': 'dict',
 			'schema': {
-				'memory': {
-					'type': 'string',
-					'regex': memory_regex,
-					'maxlength': max_memory_string_length,
+				'memory_bytes': {
+					'type': 'integer',
+					'min': 0,
 					'required': True
 				},
 
-				'min_compute_capability': {
-					'type': 'string',
-					'regex': r'\d\.\d',
-					'minlength': 3,
-					'maxlength': 3,
+				'min_compute_capability_major': {
+					'type': 'integer',
+					'min': 1,
+					'required': True
+				},
+
+				'min_compute_capability_minor': {
+					'type': 'integer',
+					'min': 0,
 					'required': True
 				}
 			}
@@ -191,10 +193,8 @@ tasks = {
 		# This field is not required, and we don't enforce that the task terminates within
 		# the amount of time given below. Its purpose is to allow the user to compute time
 		# estimates for task chains.
-		'estimated_runtime': {
-			'type': 'string',
-			'regex': time_regex,
-			'maxlength': max_time_string_length,
+		'estimated_runtime_milliseconds': {
+			'type': 'integer',
 			'mutable_iff_inactive': True,
 
 			# If this task is being used as a task group (i.e. it has one or more
@@ -205,16 +205,15 @@ tasks = {
 
 		# The amount of time a worker will wait for a task to terminate after sending it
 		# SIGTERM before resorting to using SIGKILL.
-		'max_shutdown_time': {
-			'type': 'string',
-			'regex': time_regex,
-			'maxlength': max_time_string_length,
+		'max_shutdown_time_milliseconds': {
+			'type': 'integer',
+			'min': 0,
 			'dependencies': ['command'],
 			'mutable_iff_inactive': True,
 
-			# We are generous with the default cancellation time, in case the woker
-			# must write a large amount of information to a slow disk.
-			'default': '10 minutes'
+			# We are generous with the default cancellation time (10 minutes), in case
+			# the woker must write a large amount of information to a slow disk.
+			'default': 10 * 60 * 1000
 		},
 
 		# The number of times we will put a task back on the queue if we find that it
@@ -404,7 +403,7 @@ virtual_resources = {
 					'type': 'objectid',
 					'data_relation': {
 						'resource': 'tasks',
-						'field': '_id'
+						'field': config.ID_FIELD
 					}
 				}
 			}
@@ -424,7 +423,7 @@ virtual_resources = {
 					'type': 'objectid',
 					'data_relation': {
 						'resource': 'tasks',
-						'field': '_id'
+						'field': config.ID_FIELD
 					}
 				}
 			}

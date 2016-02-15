@@ -123,7 +123,7 @@ class TestTaskCreation(unittest.TestCase):
 					'name': 'test 4',
 					'command': 'test',
 					'requested_resources': {
-						'memory': '64 GiB'
+						'memory_bytes': 64 * 2**30
 					}
 				},
 				requests.codes.created
@@ -133,7 +133,7 @@ class TestTaskCreation(unittest.TestCase):
 					'name': 'test 5',
 					'command': 'test',
 					'requested_resources': {
-						'memory': '64 GiB',
+						'memory_bytes': 64 * 2**30,
 						'cpu_cores': {'count': 8}
 					}
 				},
@@ -144,11 +144,12 @@ class TestTaskCreation(unittest.TestCase):
 					'name': 'test 6',
 					'command': 'test',
 					'requested_resources': {
-						'memory': '64 GiB',
+						'memory_bytes': 64 * 2**30,
 						'cpu_cores': {'count': 8},
 						'gpus': [{
-							'memory': '8 GiB',
-							'min_compute_capability': '5.0'
+							'memory_bytes': 8 * 2**30,
+							'min_compute_capability_major': 5,
+							'min_compute_capability_minor': 0
 						}]
 					}
 				},
@@ -220,21 +221,29 @@ class TestTaskCreation(unittest.TestCase):
 
 		changes = [
 			(
-				{'estimated_runtime': '10 minutes'},
-				{'estimated_runtime': '20 minutes'}
+				{'estimated_runtime_milliseconds': 10 * 60 * 1000},
+				{'estimated_runtime_milliseconds': 20 * 60 * 1000}
 			),
 			(
 				# The 'cores' field is already set to 1 by default, so if we don't
 				# include it in the PATCH request, we would essentially be asking
 				# the server to delete it. This will result in response of 422.
-				{'requested_resources': {'memory': '1 GiB',
-					'cpu_cores': {'count': 1}}},
-				{'requested_resources': {'memory': '2 GiB',
-					'cpu_cores': {'count': 1}}}
+				{
+					'requested_resources': {
+						'memory_bytes': 1 * 2 ** 30,
+						'cpu_cores': {'count': 1}
+					}
+				},
+				{
+					'requested_resources': {
+						'memory_bytes': 2 * 2 ** 30,
+						'cpu_cores': {'count': 1}
+					}
+				}
 			),
 			(
-				{'max_shutdown_time': '10 minutes'},
-				{'max_shutdown_time': '20 minutes'}
+				{'max_shutdown_time_milliseconds': 10 * 60 * 1000},
+				{'max_shutdown_time_milliseconds': 20 * 60 * 1000}
 			),
 			(
 				{'max_retry_count': 1},
@@ -244,7 +253,7 @@ class TestTaskCreation(unittest.TestCase):
 
 		basic_task = {
 			'command': 'test',
-			'requested_resources': {'memory': '1 GiB'}
+			'requested_resources': {'memory_bytes': 1 * 2 ** 30}
 		}
 
 		# Case (1).
@@ -904,9 +913,9 @@ if __name__ == '__main__':
 	suite = unittest.TestSuite()
 
 	with scoped_credentials(db) as cred:
-		#suite.addTest(make_suite(TestAuthorization, entry=entry, cred=cred, db=db))
-		#suite.addTest(make_suite(TestTaskCreation, entry=entry, cred=cred, db=db))
-		#suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
-		#suite.addTest(make_suite(TestCancellation, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestAuthorization, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestTaskCreation, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestCancellation, entry=entry, cred=cred, db=db))
 		suite.addTest(make_suite(TestTermination, entry=entry, cred=cred, db=db))
 		unittest.TextTestRunner().run(suite)
