@@ -316,6 +316,7 @@ class TestTaskCreation(unittest.TestCase):
 				'requested_resources': {}
 			}
 		]
+
 		children = [
 			{
 				'name': 'child 1',
@@ -697,9 +698,10 @@ class TestTermination(unittest.TestCase):
 		drop_tasks(self.db)
 
 		parents = [{'name': 'parent 1'}]
+
 		children = [
-			{'name': 'child 1'},
-			{'name': 'child 2'}
+			{'name': 'child 1', 'command': 'ls', 'requested_resources': {}},
+			{'name': 'child 2', 'command': 'ls', 'requested_resources': {}}
 		]
 
 		parent_ids = []
@@ -730,9 +732,10 @@ class TestTermination(unittest.TestCase):
 			'command': 'ls',
 			'requested_resources': {}
 		}]
+
 		children = [
-			{'name': 'child 1'},
-			{'name': 'child 2'}
+			{'name': 'child 1', 'command': 'ls', 'requested_resources': {}},
+			{'name': 'child 2', 'command': 'ls', 'requested_resources': {}}
 		]
 
 		parent_ids = []
@@ -751,6 +754,7 @@ class TestTermination(unittest.TestCase):
 			'state': 'running',
 			'update_execution_data': {'worker': self.cred.worker_name}
 		}
+
 		term_update = {
 			'state': 'terminated',
 			'update_execution_data': {
@@ -787,6 +791,7 @@ class TestTermination(unittest.TestCase):
 			'requested_resources': {},
 			'max_retry_count': 3
 		}]
+
 		children = [
 			{'name': 'child 1'},
 			{'name': 'child 2'}
@@ -861,8 +866,37 @@ class TestTermination(unittest.TestCase):
 		self.assertEqual(resp.status_code, requests.codes.ok)
 		self.assertEqual(resp.json()['state'], 'terminated')
 
-class TestCancellationTerminationInteraction(unittest.TestCase):
-	pass
+	def test_dependency_count(self):
+		drop_tasks(self.db)
+
+		parents = [{'name': 'parent 1'}, {'name': 'parent 2'}, {'name': 'parent 3'}]
+		children = [{'name': 'child 1'}] 
+		parent_ids = []
+		child_ids = []
+
+		self._insert_tasks(parents, parent_ids)
+		self._insert_tasks(children, child_ids)
+		self._add_continuations(child_ids, parent_ids[0])
+		self._add_continuations(child_ids, parent_ids[1])
+		self._add_continuations(child_ids, parent_ids[2])
+
+		for parent_id in parent_ids[:2]:
+			resp = patch({'state': 'available'}, self.entry, self.cred.provider_key,
+				'tasks', parent_id)
+			self.assertEqual(resp.status_code, requests.codes.ok)
+
+			resp = get(self.entry, self.cred.provider_key, 'tasks', child_ids[0])
+			self.assertEqual(resp.json()['state'], 'inactive')
+
+		resp = patch({'state': 'available'}, self.entry, self.cred.provider_key, 'tasks',
+			parent_ids[2])
+		self.assertEqual(resp.status_code, requests.codes.ok)
+
+		resp = get(self.entry, self.cred.provider_key, 'tasks', child_ids[0])
+		self.assertEqual(resp.json()['state'], 'terminated')
+		
+
+# TODO test for filter and projection queries using requested_resources
 
 if __name__ == '__main__':
 	entry = EntryPoint()
@@ -870,9 +904,9 @@ if __name__ == '__main__':
 	suite = unittest.TestSuite()
 
 	with scoped_credentials(db) as cred:
-		suite.addTest(make_suite(TestAuthorization, entry=entry, cred=cred, db=db))
-		suite.addTest(make_suite(TestTaskCreation, entry=entry, cred=cred, db=db))
-		suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
-		suite.addTest(make_suite(TestCancellation, entry=entry, cred=cred, db=db))
+		#suite.addTest(make_suite(TestAuthorization, entry=entry, cred=cred, db=db))
+		#suite.addTest(make_suite(TestTaskCreation, entry=entry, cred=cred, db=db))
+		#suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
+		#suite.addTest(make_suite(TestCancellation, entry=entry, cred=cred, db=db))
 		suite.addTest(make_suite(TestTermination, entry=entry, cred=cred, db=db))
 		unittest.TextTestRunner().run(suite)

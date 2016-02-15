@@ -79,7 +79,7 @@ def acquire(child_id, db):
 
 	Args:
 		child_id: ``ObjectId`` of the continuation.
-		db: Handle to the `banyan` database.
+		db: Handle to the ``banyan`` database.
 	"""
 
 	update_by_id('tasks', child_id, db, {
@@ -93,11 +93,13 @@ def release(child_id, db):
 
 	Args:
 		child_id: ``ObjectId`` of the continuation.
-		db: Handle to the `banyan` database.
+		db: Handle to the ``banyan`` database.
 	"""
 
 	child = find_by_id('tasks', child_id, db, {
 		'state': True,
+		'command': True,
+		'continuations': True,
 		'pending_dependency_count': True
 	})
 
@@ -105,13 +107,25 @@ def release(child_id, db):
 	assert child['pending_dependency_count'] >= 1
 
 	if child['pending_dependency_count'] == 1:
-		update_by_id('tasks', child_id, db, {
-			'$set': {
-				'state': 'available',
-				'pending_dependency_count': 0
-			},
-			'$currentDate': {config.LAST_UPDATED: True}
-		})
+		if 'command' in child:
+			update_by_id('tasks', child_id, db, {
+				'$set': {
+					'state': 'available',
+					'pending_dependency_count': 0
+				},
+				'$currentDate': {config.LAST_UPDATED: True}
+			})
+		else:
+			update_by_id('tasks', child_id, db, {
+				'$set': {
+					'state': 'terminated',
+					'pending_dependency_count': 0
+				},
+				'$currentDate': {config.LAST_UPDATED: True}
+			})
+
+			for cont in child['continuations']:
+				try_make_available(cont, db)
 	else:
 		update_by_id('tasks', child_id, db, {
 			'$inc': {'pending_dependency_count': -1},
@@ -143,24 +157,37 @@ def release_keep_inactive(child_id, db):
 
 def try_make_available(child_id, db):
 	"""
-	Called only when the parent task is created with no command, directly in the 'available'
-	state. In this case, the server immediately puts the task in the 'terminated' state, and
-	attempts to run all of continuations (without modifying the dependency counts).
+	This function is called when a parent task is created with no command, directly in the
+	'available' state. We could handle this event exactly as we do for regular tasks, by first
+	invoking ``acquire`` on all continuations, and then invoking ``release`` on all
+	continuations. But this results in unnecessarily database operations which change the
+	dependency counts by a net sum of zero.
+
+	This function collapses the ``acquire`` and ``release`` operations together by running only
+	those continuations that already have dependency counts of zero.
 
 	Args:
 		child_id: ``ObjectId`` of the continuation.
-		db: Handle to the `banyan` database.
+		db: Handle to the ``banyan`` database.
 	"""
 
 	child = find_by_id('tasks', child_id, db, {
 		'state': True,
+		'command': True,
+		'continuations': True,
 		'pending_dependency_count': True
 	})
 
 	assert child['state'] == 'inactive'
 
 	if child['pending_dependency_count'] == 0:
-		update_by_id('tasks', child_id, db, {'$set': {'state': 'available'}})
+		if 'command' in child:
+			update_by_id('tasks', child_id, db, {'$set': {'state': 'available'}})
+		else:
+			update_by_id('tasks', child_id, db, {'$set': {'state': 'terminated'}})
+
+			for cont in child['continuations']:
+				try_make_available(cont, db)
 
 def cancel(task_id, db, assert_inactive=False):
 	"""
@@ -168,7 +195,7 @@ def cancel(task_id, db, assert_inactive=False):
 
 	Args:
 		task_id: ID of the task to be cancelled.
-		db: Handle to the `banyan` database.
+		db: Handle to the ``banyan`` database.
 		assert_inactive: Flag used to ensure that continuations further down the tree are
 			inactive.
 	"""
