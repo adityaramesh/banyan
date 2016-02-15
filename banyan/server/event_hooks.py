@@ -215,6 +215,7 @@ def update_execution_data(updates, original):
 					'$inc': {'retry_count': 1},
 					'$set': {'state': 'available', 'execution_data_id': data_id}
 				})
+				return
 
 	if data_updates:
 		data_id = original['execution_data_id']
