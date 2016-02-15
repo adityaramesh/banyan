@@ -17,9 +17,6 @@ from banyan.server.schema import virtual_resources
 from banyan.server.mongo_common import find_by_id, update_by_id
 import banyan.server.continuations as continuations
 
-# XXX
-import sys
-
 item_level_virtual_resources = set()
 for parent_res, virtuals in virtual_resources.items():
 	for virtual_res, schema in virtuals.items():
