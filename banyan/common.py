@@ -26,8 +26,10 @@ def make_url(entry_point, resource, item=None, virtual_subresource=None):
 		return '/'.join([entry_point.base_url, resource, item])
 	return '/'.join([entry_point.base_url, resource, item, virtual_subresource])
 
-def get(entry_point, key, resource, item=None):
+def get(entry_point, key, resource, item=None, **kwargs):
 	url = make_url(entry_point, resource, item)
+	url += ''.join(['?' + k + '=' + json.dumps(v) for k, v in kwargs.items()])
+
 	headers = {'Content-Type': 'application/json'}
 	if key:
 		headers['Authorization'] = 'Basic ' + key
