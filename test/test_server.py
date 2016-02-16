@@ -904,233 +904,147 @@ class TestTermination(unittest.TestCase):
 		resp = get(self.entry, self.cred.provider_key, 'tasks', child_ids[0])
 		self.assertEqual(resp.json()['state'], 'terminated')
 
-#class TestFilterQuery(unittest.TestCase):
-#	"""
-#	Tests that queries used to select tasks satisfying certain resource requirements work as
-#	expected.
-#	"""
-#
-#	def __init__(self, entry, db, cred, *args, **kwargs):
-#		super().__init__(*args, **kwargs)
-#		self.entry = entry
-#		self.db = db
-#		self.cred = cred
-#
-#	def _insert_tasks(self, tasks, id_list):
-#		for task in tasks:
-#			resp = post(task, self.entry, self.cred.provider_key, 'tasks')
-#			id_list.append(resp.json()['_id'])
-#
-#	def test_memory_filter(self):
-#		drop_tasks(self.db)
-#
-#		tasks = [
-#			{
-#				'name': 'task 1',
-#				'command': 'ls',
-#				'requested_resources': {'cpu_memory_bytes': 1}
-#			},
-#			{
-#				'name': 'task 2',
-#				'command': 'ls',
-#				'requested_resources': {'cpu_memory_bytes': 2}
-#			},
-#			{
-#				'name': 'task 3',
-#				'command': 'ls',
-#				'requested_resources': {'cpu_memory_bytes': 3}
-#			}
-#		]
-#
-#		task_ids = []
-#		self._insert_tasks(tasks, task_ids)
-#
-#		query = {'requested_resources.memory_bytes': {'$lte': 2}}
-#		resp = get(self.entry, self.cred.provider_key, 'tasks', where=query)
-#		self.assertEqual(len(resp.json()), 2)
-#
-#		query = {'requested_resources': {'memory_bytes': {'$lte': 2}}}
-#		resp = get(self.entry, self.cred.provider_key, 'tasks', where=query)
-#		self.assertEqual(len(resp.json()), 2)
-#
-#	def test_cores_filter(self):
-#		drop_tasks(self.db)
-#
-#		tasks = [
-#			{
-#				'name': 'task 1',
-#				'command': 'ls',
-#				'requested_resources': {'cpu_cores': {'count': 1}}
-#			},
-#			{
-#				'name': 'task 2',
-#				'command': 'ls',
-#				'requested_resources': {'cpu_cores': {'count': 2}}
-#			},
-#			{
-#				'name': 'task 3',
-#				'command': 'ls',
-#				'requested_resources': {'cpu_cores': {'count': 3}}
-#			}
-#		]
-#
-#		task_ids = []
-#		self._insert_tasks(tasks, task_ids)
-#
-#		query = {'requested_resources.cpu_cores.count': {'$lte': 2}}
-#		resp = get(self.entry, self.cred.provider_key, 'tasks', where=query)
-#		self.assertEqual(len(resp.json()), 2)
-#
-#	def test_gpu_filter(self):
-#		drop_tasks(self.db)
-#
-#		mem = 2 ** 50
-#		cpu_cores = 100
-#		gpu_mem = 10
-#		cc_major = 2
-#		cc_minor = 10
-#
-#		tasks = [
-#			# Shouldn't match because major CC of second GPU is too high.
-#			{
-#				'name': 'task 1',
-#				'command': 'ls',
-#				'requested_resources': {'gpus': [
-#					{
-#						'memory_bytes': 10,
-#						'min_compute_capability_major': 2,
-#						'min_compute_capability_minor': 2,
-#					},
-#					{
-#						'memory_bytes': 10,
-#						'min_compute_capability_major': 3,
-#						'min_compute_capability_minor': 2
-#					}
-#				]}
-#			},
-#			# Shouldn't match because memory of second GPU is too high.
-#			{
-#				'name': 'task 2',
-#				'command': 'ls',
-#				'requested_resources': {'gpus': [
-#					{
-#						'memory_bytes': 10,
-#						'min_compute_capability_major': 2,
-#						'min_compute_capability_minor': 2,
-#					},
-#					{
-#						'memory_bytes': 15,
-#						'min_compute_capability_major': 2,
-#						'min_compute_capability_minor': 2
-#					}
-#				]}
-#			},
-#			# This one should match.
-#			{
-#				'name': 'task 3',
-#				'command': 'ls',
-#				'requested_resources': {'gpus': [
-#					{
-#						'memory_bytes': 10,
-#						'min_compute_capability_major': 2,
-#						'min_compute_capability_minor': 10,
-#					},
-#					{
-#						'memory_bytes': 10,
-#						'min_compute_capability_major': 1,
-#						'min_compute_capability_minor': 100
-#					}
-#				]}
-#			}
-#		]
-#
-#		task_ids = []
-#		self._insert_tasks(tasks, task_ids)
-#
-#		from pprint import pprint
-#
-#		def cur_gpu(attr):
-#			return '$requested_resources.gpus.' + attr
-#
-#		memory_criterion = {'$lte': ['$requested_resources.memory_bytes', mem]}
-#		cpu_cores_criterion = {'$lte': ['$requested_resources.cpu_cores.count', cpu_cores]}
-#		gpu_criterion = {'$and': [
-#			{'$lte': [cur_gpu('memory_bytes'), gpu_mem]},
-#			{'$or': [
-#				{'$lt': [cur_gpu('compute_capability_major'), cc_major]},
-#				{'$and': [
-#					{'$eq': [cur_gpu('compute_capability_major'), cc_major]},
-#					{'$lte': [cur_gpu('compute_capability_minor'), cc_minor]}
-#				]}
-#			]}
-#		]}
-#
-#		res = db.tasks.aggregate([
-#			# For each task we encounter, creates an additional task for each element in 
-#			# the list ``requested_resources.gpus``.
-#			{'$unwind': '$requested_resources.gpus'},
-#
-#			# Criterion used to group together the new set of tasks generated from each
-#			# original task in the previous step. Fields prefixed by dollar signs are
-#			# copies of the corresponding fields without dollar signs, and their values
-#			# may be modified by the 'unwind' operation.
-#			{'$group': {
-#				'_id': '$_id',
-#
-#				# Copies the value of the field from the first document in the
-#				# group.
-#				'name': {'$first': '$name'},
-#				'command': {'$first': '$command'},
-#				'estimated_runtime_milliseconds': {
-#					'$first': '$estimated_runtime_milliseconds'
-#				},
-#				'max_shutdown_time_milliseconds': {
-#					'$first': '$max_shutdown_time_milliseconds'
-#				},
-#
-#				# I couldn't find a way to reconstruct the ``required_resources``
-#				# along with the original ``gpu`` list in this step alone. As a
-#				# workaround, I'm reassembling the ``gpus`` list outside of
-#				# ``requested_resources``, and putting it back in the projection
-#				# step.
-#				'requested_resources': {'$first': '$requested_resources'},
-#				'gpus': {'$push': '$requested_resources.gpus'},
-#
-#				'total_gpus': {'$sum': 1},
-#				'matching_gpus': {'$sum': {'$cond': [{'$and': [
-#					memory_criterion,
-#					cpu_cores_criterion,
-#					gpu_criterion
-#				]}, 1, 0]}}
-#			}},
-#
-#			# Specifies the fields of the tasks from the group operation that should be
-#			# retained.
-#			{'$project': {
-#				'name': True,
-#				'command': True,
-#				'estimated_runtime_milliseconds': True,
-#				'max_shutdown_time_milliseconds': True,
-#
-#				'requested_resources': {
-#					'memory_bytes': '$requested_resources.memory_bytes',
-#					'cpu_cores': '$requested_resources.cpu_cores',
-#					'gpus': '$gpus'
-#				},
-#
-#				'is_match': {'$cond': [{
-#					'$eq': ['$total_gpus', '$matching_gpus']
-#				}, 1, 0]},
-#			}},
-#
-#			# Filter for tasks to be added to the result set.
-#			{'$match': {'is_match': 1}},
-#
-#			# XXX use the setting for this
-#			{'$limit': 100}
-#		])
-#
-#		pprint(res)
+class TestFilterQuery(unittest.TestCase):
+	"""
+	Tests that queries used to select tasks satisfying certain resource requirements work as
+	expected.
+	"""
+
+	def __init__(self, entry, db, cred, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.entry = entry
+		self.db = db
+		self.cred = cred
+
+	def _insert_tasks(self, tasks, id_list):
+		for task in tasks:
+			resp = post(task, self.entry, self.cred.provider_key, 'tasks')
+			id_list.append(resp.json()['_id'])
+
+	def test_memory_filter(self):
+		drop_tasks(self.db)
+
+		tasks = [
+			{
+				'name': 'task 1',
+				'command': 'ls',
+				'requested_resources': {'cpu_memory_bytes': 1}
+			},
+			{
+				'name': 'task 2',
+				'command': 'ls',
+				'requested_resources': {'cpu_memory_bytes': 2}
+			},
+			{
+				'name': 'task 3',
+				'command': 'ls',
+				'requested_resources': {'cpu_memory_bytes': 3}
+			}
+		]
+
+		task_ids = []
+		self._insert_tasks(tasks, task_ids)
+
+		query = {'requested_resources.cpu_memory_bytes': {'$lte': 2}}
+		resp = get(self.entry, self.cred.provider_key, 'tasks', where=query)
+		self.assertEqual(len(resp.json()['_items']), 2)
+
+	def test_cores_filter(self):
+		drop_tasks(self.db)
+
+		tasks = [
+			{
+				'name': 'task 1',
+				'command': 'ls',
+				'requested_resources': {'cpu_cores': {'count': 1}}
+			},
+			{
+				'name': 'task 2',
+				'command': 'ls',
+				'requested_resources': {'cpu_cores': {'count': 2}}
+			},
+			{
+				'name': 'task 3',
+				'command': 'ls',
+				'requested_resources': {'cpu_cores': {'count': 3}}
+			}
+		]
+
+		task_ids = []
+		self._insert_tasks(tasks, task_ids)
+
+		query = {'requested_resources.cpu_cores.count': {'$lte': 2}}
+		resp = get(self.entry, self.cred.provider_key, 'tasks', where=query)
+		self.assertEqual(len(resp.json()['_items']), 2)
+
+	def test_gpu_filter(self):
+		drop_tasks(self.db)
+
+		gpus = 1
+		gpu_mem = 10
+		cc_major = 2
+		cc_minor = 10
+
+		tasks = [
+			# Shouldn't match because major CC is too high.
+			{
+				'name': 'task 1',
+				'command': 'ls',
+				'requested_resources': {
+					'gpu_count': 1,
+					'gpu_memory_bytes': 10,
+					'gpu_compute_capability_major': 3,
+					'gpu_compute_capability_minor': 0
+				}
+			},
+
+			# Shouldn't match because memory requirement is too high.
+			{
+				'name': 'task 2',
+				'command': 'ls',
+				'requested_resources': {
+					'gpu_count': 1,
+					'gpu_memory_bytes': 15,
+					'gpu_compute_capability_major': 2,
+					'gpu_compute_capability_minor': 0
+				}
+			},
+
+			# This one should match.
+			{
+				'name': 'task 3',
+				'command': 'ls',
+				'requested_resources': {
+					'gpu_count': 1,
+					'gpu_memory_bytes': 10,
+					'gpu_compute_capability_major': 1,
+					'gpu_compute_capability_minor': 100
+				}
+			}
+		]
+
+		task_ids = []
+		self._insert_tasks(tasks, task_ids)
+
+		query = {
+			'$and': [
+				{'requested_resources.gpu_count': {'$lte': gpus}},
+				{'requested_resources.gpu_memory_bytes': {'$lte': gpu_mem}},
+				{'$or': [
+					{'requested_resources.gpu_compute_capability_major':
+						{'$lt': cc_major}},
+					{'$and': [
+						{'requested_resources.gpu_compute_capability_major':
+							{'$eq': cc_major}},
+						{'requested_resources.gpu_compute_capability_minor':
+							{'$lte': cc_minor}}
+					]}
+				]}
+			]
+		}
+
+		resp = get(self.entry, self.cred.provider_key, 'tasks', where=query)
+		self.assertEqual(len(resp.json()['_items']), 1)
 		
 if __name__ == '__main__':
 	entry = EntryPoint()
@@ -1143,5 +1057,5 @@ if __name__ == '__main__':
 		suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
 		suite.addTest(make_suite(TestCancellation, entry=entry, cred=cred, db=db))
 		suite.addTest(make_suite(TestTermination, entry=entry, cred=cred, db=db))
-		#suite.addTest(make_suite(TestFilterQuery, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestFilterQuery, entry=entry, cred=cred, db=db))
 		unittest.TextTestRunner().run(suite)
