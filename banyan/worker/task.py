@@ -51,10 +51,10 @@ def reserved_resources(requested_resources, resource_set):
 		resource_set: Subset of system resources that we are allowed to use.
 	"""
 
-	req_memory     = requested_resources['memory_bytes']
+	req_memory     = requested_resources['cpu_memory_bytes']
 	min_core_count = requested_resources['cpu_cores']['count']
 	min_core_ratio = requested_resources['cpu_cores']['percent'] / 100
-	gpus           = len(requested_resources['gpus'])
+	gpus           = requested_resources['gpu_count']
 
 	total_mem   = resource_set.memory_bytes
 	total_cores = resource_set.cpu_cores

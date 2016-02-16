@@ -25,7 +25,7 @@ Used by the user to indicate the resources that are expected to be consumed by a
 course of its execution.
 """
 resource_info = {
-	'memory_bytes': {
+	'cpu_memory_bytes': {
 		'type': 'integer',
 		'min': 0,
 		'default': 128 * 2 ** 20
@@ -55,31 +55,29 @@ resource_info = {
 		}
 	},
 
-	'gpus': {
-		'type': 'list',
-		'default': [],
-		'schema': {
-			'type': 'dict',
-			'schema': {
-				'memory_bytes': {
-					'type': 'integer',
-					'min': 0,
-					'required': True
-				},
+	# The abstraction for GPUs below is techincally wrong, because the same system can have two
+	# different kinds of GPUs. But this is rare in computing environments, and accounting for
+	# this would complicate the logic in many parts of both the server and the worker.
 
-				'min_compute_capability_major': {
-					'type': 'integer',
-					'min': 1,
-					'required': True
-				},
+	'gpu_count': {
+		'type': 'integer',
+		'min': 0,
+		'default': 0
+	},
 
-				'min_compute_capability_minor': {
-					'type': 'integer',
-					'min': 0,
-					'required': True
-				}
-			}
-		}
+	'gpu_memory_bytes': {
+		'type': 'integer',
+		'min': 0
+	},
+
+	'gpu_compute_capability_major': {
+		'type': 'integer',
+		'min': 1
+	},
+
+	'gpu_compute_capability_minor': {
+		'type': 'integer',
+		'min': 0
 	}
 }
 
@@ -124,19 +122,19 @@ tasks = {
 	'schema': {
 		# Information provided by the client.
 
+		'name': {
+			'type': 'string',
+			'maxlength': max_name_string_length,
+			'unique': True,
+			'mutable_iff_inactive': True
+		},
+
 		'command': {
 			'type': 'string',
 			'maxlength': max_command_string_length,
 			'empty': False,
 			'mutable_iff_inactive': True,
 			'dependencies': ['requested_resources']
-		},
-
-		'name': {
-			'type': 'string',
-			'maxlength': max_name_string_length,
-			'unique': True,
-			'mutable_iff_inactive': True
 		},
 
 		# If a task has no parents, the user can optionally create it in the `available`
