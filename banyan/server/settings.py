@@ -21,8 +21,6 @@ use any credentials.
 MONGO_HOST         = os.environ.get('MONGO_HOST', 'localhost')
 MONGO_PORT         = os.environ.get('MONGO_PORT', 27017)
 MONGO_DBNAME       = os.environ.get('MONGO_DBNAME', 'banyan')
-PAGINATION_LIMIT   = max_task_set_size
-PAGINATION_DEFAULT = max_task_set_size
 
 # Disable etag concurrency control.
 IF_MATCH = False
