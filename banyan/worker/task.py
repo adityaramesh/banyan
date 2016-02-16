@@ -18,7 +18,6 @@ from subprocess import Popen, DEVNULL
 from psutil import Process
 
 from banyan.worker.resource_info import ResourceSummary
-from banyan.server.constants import memory_regex
 
 ResourceUsageBase = namedtuple('ResourceUsageBase', ['resident_memory_bytes', 'cpu_cores', 'gpus'])
 
