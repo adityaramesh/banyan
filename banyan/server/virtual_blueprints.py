@@ -163,6 +163,11 @@ def route(p_res, v_res, schema):
 			synchronize)
 		schema['handlers']['resource_level'] = h1
 
+		"""
+		Note: ``payload`` aborts with 400 in case the request is malformed, so we don't have
+		to worry about exceptions. From this point, we can assume that the request has a
+		valid JSON  body.
+		"""
 		@router.route('/' + p_res + '/' + v_res, methods=['POST'])
 		def route_resource_level():
 			return h1(payload())
