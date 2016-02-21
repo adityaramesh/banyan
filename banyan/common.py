@@ -8,11 +8,47 @@ Definitions used by several Banyan modules.
 """
 
 import json
+import string
+
 import socket
 import requests
 import unittest
 
+from base64 import b64encode
+from random import SystemRandom
+
 from config.settings import banyan_port
+
+def make_token():
+	"""
+	Securely generates an authentication token.
+
+	We can't use arbitrary byte sequences, because the token must be embeddable in the
+	'Authentication' header of the HTTP request. Flask automatically validates the contents of
+	this header and parses its contents for us. In this process, the raw bytes in the header are
+	assumed to be encoded using UTF-8. The mapping between UTF-8 and binary is not one-to-one,
+	so decoding is a lossy process. That is, printing out the base-64 encoded contents of the
+	parsed header will give us a different result from the original base-64 encoded UUID, in
+	general.
+
+	To avoid this problem, we instead generate a random *alphanumeric* string to use as the
+	token. The implementation here is based on the one given by Ignacio Vazquez-Abrams here_.
+
+	.. _here: http://stackoverflow.com/a/2257449/414271
+	"""
+
+	return ''.join(SystemRandom().choice(string.ascii_letters + string.digits + \
+		string.punctuation.replace(':', '')) for _ in range(16))
+
+def authorization_key(token):
+	"""
+	Returns the string that should be included in the 'Authorization' header in order to use the
+	given token for validation.
+	"""
+
+	username = token + ':'
+	return b64encode(username.encode()).decode('utf-8')
+
 
 class EntryPoint:
 	def __init__(self):

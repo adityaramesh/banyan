@@ -7,10 +7,12 @@ banyan.server.event_hooks
 Provides the event hooks that implement the server-side functionality.
 """
 
+import json
 from bson import ObjectId
 from flask import g, current_app as app
 from eve.utils import config
 
+from banyan.common import make_token
 from banyan.server.lock import lock
 from banyan.server.state import legal_provider_transitions
 from banyan.server.schema import virtual_resources
@@ -50,17 +52,24 @@ def release_lock_if_necessary(request, payload):
 def modify_state_changes(request, lookup):
 	"""
 	Converts task state changes requested by users to the actual changes that need to be made.
+	Also appends the task ID to the ``g`` object, so that ``append_execution_data_token`` can
+	run the database query to obtain the token.
 	"""
 
 	assert g.token is not None
 	assert g.user is not None
 	updates = request.json
 
-	if 'state' not in updates:
+	"""
+	``config.ID_FIELD`` should be in ``lookup`` if a state change is being made, but we will let
+	the validator take care of diagnosing and reporting this error.
+	"""
+	if 'state' not in updates or config.ID_FIELD not in lookup:
 		return
-	if not (g.user['role'] == 'provider' and updates['state'] == 'cancelled'):
+	if updates['state'] == 'running':
+		g.task_id = lookup[config.ID_FIELD]
 		return
-	if config.ID_FIELD not in lookup:
+	if g.user['role'] != 'provider' or updates['state'] != 'cancelled':
 		return
 
 	db = app.data.driver.db
@@ -204,15 +213,16 @@ def update_execution_data(updates, original):
 		attempt_count = original['attempt_count']
 		max_attempt_count = original['max_attempt_count']
 
-		if updates['state'] == 'running' and attempt_count == 0:
-			assert data_updates is not None
-			new_data = {'task': id_, 'attempt_count': 1}
-			new_data.update(data_updates)
-			data_id = db.execution_info.insert(new_data)
+		if updates['state'] == 'running':
+			if attempt_count == 0:
+				assert data_updates is not None
+				new_data = {'task': id_, 'attempt_count': 1, 'token': make_token()}
+				new_data.update(data_updates)
+				data_id = db.execution_info.insert(new_data)
 
-			update_by_id('tasks', id_, db, {
-				'$set': {'attempt_count': 1, 'execution_data_id': data_id}
-			})
+				update_by_id('tasks', id_, db, {
+					'$set': {'attempt_count': 1, 'execution_data_id': data_id}
+				})
 			return
 
 		if updates['state'] == 'terminated' and attempt_count < max_attempt_count:
@@ -221,9 +231,10 @@ def update_execution_data(updates, original):
 			else:
 				update_by_id('execution_info', original['execution_data_id'], db,
 					{'$set': data_updates})
-				new_data = {'task': id_, 'attempt_count': attempt_count + 1}
-				data_id = db.execution_info.insert(new_data)
+				new_data = {'task': id_, 'attempt_count': attempt_count + 1,
+					'token': make_token()}
 
+				data_id = db.execution_info.insert(new_data)
 				update_by_id('tasks', id_, db, {
 					'$inc': {'attempt_count': 1},
 					'$set': {'state': 'available', 'execution_data_id': data_id}
@@ -231,8 +242,21 @@ def update_execution_data(updates, original):
 				return
 
 	if data_updates:
+		data_updates.pop('token')
 		data_id = original['execution_data_id']
 		update_by_id('execution_info', data_id, db, {'$set': data_updates})
+
+def append_execution_data_token(request, payload):
+	if not hasattr(g, 'task_id'):
+		return
+
+	db = app.data.driver.db
+	task = find_by_id('tasks', ObjectId(g.task_id), db, {'execution_data_id': True})
+	data = find_by_id('execution_info', task['execution_data_id'], db, {'token': True})
+
+	parsed_payload = json.loads(payload.get_data().decode('utf-8'))
+	parsed_payload['token'] = data['token']
+	payload.set_data(json.dumps(parsed_payload))
 
 def register(app):
 	app.on_pre_POST_tasks  += acquire_lock
@@ -240,6 +264,7 @@ def register(app):
 
 	app.on_pre_PATCH_tasks  += acquire_lock_if_necessary
 	app.on_pre_PATCH_tasks  += modify_state_changes
+	app.on_post_PATCH_tasks += append_execution_data_token
 	app.on_post_PATCH_tasks += release_lock_if_necessary
 
 	app.on_insert_tasks   += terminate_empty_tasks
@@ -253,3 +278,4 @@ def register(app):
 	@app.errorhandler(Exception)
 	def handle_error(error):
 		release_lock_if_necessary(None, None)
+		raise error

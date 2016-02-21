@@ -779,6 +779,7 @@ class TestTermination(unittest.TestCase):
 
 		resp = patch(claim_update, self.entry, self.cred.worker_key, 'tasks', parent_ids[0])
 		self.assertEqual(resp.status_code, requests.codes.ok)
+		term_update['update_execution_data']['token'] = resp.json()['token']
 
 		resp = patch(term_update, self.entry, self.cred.worker_key, 'tasks', parent_ids[0])
 		self.assertEqual(resp.status_code, requests.codes.ok)
@@ -838,6 +839,7 @@ class TestTermination(unittest.TestCase):
 
 		resp = patch(claim_update, self.entry, self.cred.worker_key, 'tasks', parent_ids[0])
 		self.assertEqual(resp.status_code, requests.codes.ok)
+		term_update['update_execution_data']['token'] = resp.json()['token']
 
 		resp = patch(term_update, self.entry, self.cred.worker_key, 'tasks', parent_ids[0])
 		self.assertEqual(resp.status_code, requests.codes.ok)
@@ -901,6 +903,7 @@ class TestTermination(unittest.TestCase):
 			resp = patch(claim_update, self.entry, self.cred.worker_key, 'tasks',
 				parent_ids[0])
 			self.assertEqual(resp.status_code, requests.codes.ok)
+			term_update['update_execution_data']['token'] = resp.json()['token']
 
 			resp = get(self.entry, self.cred.provider_key, 'tasks', parent_ids[0])
 			self.assertEqual(resp.status_code, requests.codes.ok)
@@ -932,6 +935,7 @@ class TestTermination(unittest.TestCase):
 
 		resp = patch(claim_update, self.entry, self.cred.worker_key, 'tasks', parent_ids[0])
 		self.assertEqual(resp.status_code, requests.codes.ok)
+		term_update['update_execution_data']['token'] = resp.json()['token']
 
 		resp = patch(term_update, self.entry, self.cred.worker_key, 'tasks', parent_ids[0])
 		self.assertEqual(resp.status_code, requests.codes.ok)
@@ -1122,10 +1126,10 @@ if __name__ == '__main__':
 	suite = unittest.TestSuite()
 
 	with scoped_credentials(db) as cred:
-		suite.addTest(make_suite(TestAuthorization, entry=entry, cred=cred, db=db))
-		suite.addTest(make_suite(TestTaskCreation, entry=entry, cred=cred, db=db))
-		suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
-		suite.addTest(make_suite(TestCancellation, entry=entry, cred=cred, db=db))
+		#suite.addTest(make_suite(TestAuthorization, entry=entry, cred=cred, db=db))
+		#suite.addTest(make_suite(TestTaskCreation, entry=entry, cred=cred, db=db))
+		#suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
+		#suite.addTest(make_suite(TestCancellation, entry=entry, cred=cred, db=db))
 		suite.addTest(make_suite(TestTermination, entry=entry, cred=cred, db=db))
-		suite.addTest(make_suite(TestFilterQuery, entry=entry, cred=cred, db=db))
+		#suite.addTest(make_suite(TestFilterQuery, entry=entry, cred=cred, db=db))
 		unittest.TextTestRunner().run(suite)

@@ -13,7 +13,8 @@ import banyan.server.continuations as continuations
 import banyan.server.execution_data as execution_data_
 
 from banyan.server.constants import *
-from banyan.server.authentication import TokenAuth, RestrictCreationToProviders
+from banyan.server.authentication import TokenAuth, RestrictAccessToProviders, \
+	RestrictCreationToProviders
 
 """
 XXX: Don't use multiline strings to write comments inside of dicts, because the
@@ -96,6 +97,15 @@ execution_data = {
 	'attempt_count': {
 		'type': 'integer',
 		'min': 1,
+		'readonly': True
+	},
+
+	# Used to ensure that a worker cannot make an update to a job it has not claimed, or update
+	# a job that it has previously claimed but is now assigned to another worker.
+	'token': {
+		'type': 'string',
+		'minlength': 16,
+		'maxlength': 16,
 		'readonly': True
 	},
 
@@ -262,7 +272,7 @@ tasks = {
 }
 
 execution_info = {
-	'authentication': TokenAuth,
+	'authentication': RestrictAccessToProviders,
 	'resource_methods': ['GET', 'POST'],
 	'item_methods': ['GET', 'PATCH'],
 	'allowed_read_roles': ['provider', 'worker'],

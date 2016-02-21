@@ -27,6 +27,22 @@ class TokenAuth(TokenAuthBase):
 			return False
 		return True
 
+class RestrictAccessToProviders(TokenAuthBase):
+	def check_auth(self, token, allowed_roles, resource, method):
+		db = app.data.driver.db
+		res = db.users.find_one({'token': token}, {'role': True})
+
+		"""
+		Save the token and associated user, in case they will be needed later during
+		validation or processing.
+		"""
+		g.token = token
+		g.user = res
+
+		if not res or res['role'] != 'provider':
+			return False
+		return True
+
 class RestrictCreationToProviders(TokenAuthBase):
 	def check_auth(self, token, allowed_roles, resource, method):
 		db = app.data.driver.db
