@@ -12,7 +12,7 @@ import socket
 import requests
 import unittest
 
-from banyan.settings import banyan_port
+from config.settings import banyan_port
 
 class EntryPoint:
 	def __init__(self):

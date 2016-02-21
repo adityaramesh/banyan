@@ -7,7 +7,7 @@ banyan.worker.settings
 Settings for the worker client program.
 """
 
-from banyan.settings import max_task_set_size
+from config.settings import max_task_set_size
 
 """
 XXX: If ``usage_limits`` is not declared, than Banyan will attempt to consume all resources
