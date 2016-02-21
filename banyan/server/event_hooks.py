@@ -26,9 +26,7 @@ for parent_res, virtuals in virtual_resources.items():
 
 def acquire_lock(request):
 	lock.acquire()
-
-def release_lock(request, payload):
-	lock.release()
+	g.lock_owner = True
 
 def acquire_lock_if_necessary(request, lookup):
 	if not request.json:
@@ -238,7 +236,7 @@ def update_execution_data(updates, original):
 
 def register(app):
 	app.on_pre_POST_tasks  += acquire_lock
-	app.on_post_POST_tasks += release_lock
+	app.on_post_POST_tasks += release_lock_if_necessary
 
 	app.on_pre_PATCH_tasks  += acquire_lock_if_necessary
 	app.on_pre_PATCH_tasks  += modify_state_changes
@@ -251,3 +249,7 @@ def register(app):
 	app.on_update_tasks  += filter_virtual_resources
 	app.on_updated_tasks += process_continuations
 	app.on_updated_tasks += update_execution_data
+
+	@app.errorhandler(Exception)
+	def handle_error(error):
+		release_lock_if_necessary(None, None)
