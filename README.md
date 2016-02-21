@@ -20,10 +20,45 @@ claims tasks from the queue based on available resources.
 
 # Agenda
 
-- Server-side code.
-  - Add tests for virtual resources in `test_server.py`.
-    - State changes; addition, removal, cancellation of continuations; updates
-      to execution data.
+- TODO: try to prevent deadlock in the event of an internal server error. can we release any
+  acquired locks in a handler somewhere?
+
+- Move Banyan settings to an external path rather than keeping the settings file in the `banyan`
+  source directory.
+- Add key to the execution data field, and require workers to provide the key when they post updates
+  to the execution data. It's not good for workers infer job abandonment by the server with a 422
+  response, since there is a relatively high probability of false positives.
+- Add a virtual resource (accessible by providers only) to register workers with the Banyan server.
+  Don't scan the `auth` database to detect workers; it should only be store credentials, not IPs.
+
+- Maintain connections to workers to check for responsiveness and perform cancellation.
+  - Change the `exit_status` field of execution data so that it is a string rather than an integer.
+    Otherwise, it becomes difficult for us to convey information to the user about what the state
+    means. Success is "success"; failure is "failure" if the program exited with -1. If the program
+    exited with a signal, the status is "failure (<signal>)". It's up to the worker to interpret the
+    exit status of the program and provide a string.
+  - If a worker does not respond in a maximum allotted time, set the exit status of all jobs
+    currently being serviced by that worker to "abandoned (worker unreachable)".
+  - On the other hand, if the worker cannot reach the server in the maximum allotted time limit, it
+    should assume that all of its job were abandoned, cancel all active jobs, and dump the task
+    cache.
+- To properly clean up resources in Eve, the following links suggest that we have to options:
+  - http://stackoverflow.com/questions/30739244/python-flask-shutdown-event-handler
+  - http://stackoverflow.com/questions/10795095/where-do-i-put-cleanup-code-in-a-flask-application
+- Option 1: use atexit. But this won't work if the application is terminated by a signal.
+- Option 2: respond to the signals (e.g. using signalfd with epoll in a separate thread).
+
+- Look at `worker.md` for next stuff to implement.
+  - Call the driver file `run.py`.
+  - Implement task cache (possibly in new test file).
+  - Test.
+  - Implement cancellation buffer.
+  - Test.
+  - Implement updates (both for cancelled tasks and the regular status updates).
+  - Test.
+
+- Test how quickly contention for jobs is resolved by setting up one server and
+  multiple workers.
 
 - Worker-side code.
   - Implement basic prototype to run jobs without the server.
@@ -70,6 +105,12 @@ password (as is the case for authentication tokens), an encoded colon should be 
 of the username.
 
 	curl -X POST -H 'Content-Type: application/json' -H 'Authorization: Basic tmHMHLY0ues0+eh1fEa04To=' -d '{"task": "56a210d5e7794978227cb2f4", "time": "Tue, 02 Apr 2013 10:29:13 GMT", "resident_memory_bytes": 256}' http://172.22.140.7:5000/memory_usage
+
+Example of filter query (note the escaped characters):
+
+	curl -i -g -H 'Authorization: Basic fHdaOCp1NE9kNEFyTGp0NDo=' 'http://172.22.140.7:5100/tasks?where={"name":%20"task%201"}'
+
+	curl -i -g -H 'Authorization: Basic fHdaOCp1NE9kNEFyTGp0NDo=' 'http://172.22.140.7:5100/tasks?where={"retry_count":{"$lt":10}}'
 
 # Limitations for first version
 

@@ -210,7 +210,8 @@ class TestTaskCreation(unittest.TestCase):
 		"""
 		Here, we verify that the behavior when attempting to change various fields of a task
 		is as expected. In particular:
-		1. Setting any field to its current value (e.g. a no-op) should work if the task is in                   the ``inactive`` state.
+		1. Setting any field to its current value (e.g. a no-op) should work if the task is
+		   in the ``inactive`` state.
 		2. While a task is in the `inactive` state, modifying any field that is not marked
 		   ``readonly`` should work.
 		3. If a task is not in the `inactive` state, then any attempt to modify the value of
@@ -246,8 +247,8 @@ class TestTaskCreation(unittest.TestCase):
 				{'max_shutdown_time_milliseconds': 20 * 60 * 1000}
 			),
 			(
-				{'max_retry_count': 1},
-				{'max_retry_count': 2}
+				{'max_attempt_count': 1},
+				{'max_attempt_count': 2}
 			)
 		]
 
@@ -513,9 +514,9 @@ class TestExecutionInfo(unittest.TestCase):
 
 		bad_updates = [
 			{'task': task_ids[0]},
-			{'retry_count': 2},
+			{'attempt_count': 2},
 			{'worker': ''},
-			{'exit_status': 0},
+			{'exit_status': 'success'},
 			{'time_terminated': 'Tue, 02 Apr 2013 10:29:13 GMT'}
 		]
 
@@ -767,7 +768,7 @@ class TestTermination(unittest.TestCase):
 		term_update = {
 			'state': 'terminated',
 			'update_execution_data': {
-				'exit_status': 0,
+				'exit_status': 'success',
 				'time_terminated': 'Tue, 02 Apr 2013 10:29:13 GMT'
 			}
 		}
@@ -791,14 +792,19 @@ class TestTermination(unittest.TestCase):
 			self.assertEqual(resp.json()['state'], 'available')
 			self.assertEqual(resp.json()['pending_dependency_count'], 0)
 
-	def test_retry_on_unsuccessful_termination(self):
+	def test_cancellation_after_max_attempts(self):
+		"""
+		Verifies that if a task is terminated and has reached the maximum number of
+		execution attempts, then is no longer made available, and all of its continuations
+		are cancelled.
+		"""
+
 		drop_tasks(self.db)
 
 		parents = [{
 			'name': 'task',
 			'command': 'ls',
-			'requested_resources': {},
-			'max_retry_count': 3
+			'requested_resources': {}
 		}]
 
 		children = [
@@ -825,14 +831,73 @@ class TestTermination(unittest.TestCase):
 		term_update = {
 			'state': 'terminated',
 			'update_execution_data': {
-				'exit_status': 1,
+				'exit_status': 'failure',
+				'time_terminated': 'Tue, 02 Apr 2013 10:29:13 GMT'
+			}
+		}
+
+		resp = patch(claim_update, self.entry, self.cred.worker_key, 'tasks', parent_ids[0])
+		self.assertEqual(resp.status_code, requests.codes.ok)
+
+		resp = patch(term_update, self.entry, self.cred.worker_key, 'tasks', parent_ids[0])
+		self.assertEqual(resp.status_code, requests.codes.ok)
+
+		resp = get(self.entry, self.cred.provider_key, 'tasks', parent_ids[0])
+		self.assertEqual(resp.status_code, requests.codes.ok)
+		self.assertEqual(resp.json()['state'], 'terminated')
+
+		for child_id in child_ids:
+			resp = get(self.entry, self.cred.provider_key, 'tasks', child_id)
+			self.assertEqual(resp.json()['state'], 'cancelled')
+			self.assertEqual(resp.json()['pending_dependency_count'], 1)
+
+	def test_retry_on_unsuccessful_termination(self):
+		"""
+		Verifies that if a task is terminated but has not reached its maximum attempt count,
+		then it is made available again without its continuations being cancelled.
+		"""
+
+		drop_tasks(self.db)
+
+		parents = [{
+			'name': 'task',
+			'command': 'ls',
+			'requested_resources': {},
+			'max_attempt_count': 3
+		}]
+
+		children = [
+			{'name': 'child 1'},
+			{'name': 'child 2'}
+		]
+
+		parent_ids = []
+		child_ids = []
+
+		self._insert_tasks(parents, parent_ids)
+		self._insert_tasks(children, child_ids)
+		self._add_continuations(child_ids, parent_ids[0])
+
+		resp = patch({'state': 'available'}, self.entry, self.cred.provider_key, 'tasks',
+			parent_ids[0])
+		self.assertEqual(resp.status_code, requests.codes.ok)
+
+		claim_update = {
+			'state': 'running',
+			'update_execution_data': {'worker': self.cred.worker_name}
+		}
+
+		term_update = {
+			'state': 'terminated',
+			'update_execution_data': {
+				'exit_status': 'failure',
 				'time_terminated': 'Tue, 02 Apr 2013 10:29:13 GMT'
 			}
 		}
 
 		old_data_id = None
 
-		for _ in range(3):
+		for _ in range(2):
 			resp = patch(claim_update, self.entry, self.cred.worker_key, 'tasks',
 				parent_ids[0])
 			self.assertEqual(resp.status_code, requests.codes.ok)
@@ -861,7 +926,7 @@ class TestTermination(unittest.TestCase):
 				self.assertEqual(resp.json()['pending_dependency_count'], 1)
 
 		"""
-		Ensure that, after the max retry count is reached, the task will no longer be made
+		Ensure that, after the max attempt count is reached, the task will no longer be made
 		available on unsuccessful termination.
 		"""
 
@@ -874,6 +939,11 @@ class TestTermination(unittest.TestCase):
 		resp = get(self.entry, self.cred.provider_key, 'tasks', parent_ids[0])
 		self.assertEqual(resp.status_code, requests.codes.ok)
 		self.assertEqual(resp.json()['state'], 'terminated')
+
+		for child_id in child_ids:
+			resp = get(self.entry, self.cred.provider_key, 'tasks', child_id)
+			self.assertEqual(resp.json()['state'], 'cancelled')
+			self.assertEqual(resp.json()['pending_dependency_count'], 1)
 
 	def test_dependency_count(self):
 		drop_tasks(self.db)

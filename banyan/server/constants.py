@@ -33,4 +33,4 @@ max_update_list_length = 128
 max_name_string_length = 256
 max_command_string_length = 1024
 
-default_max_retry_count = 0
+default_max_attempts = 1

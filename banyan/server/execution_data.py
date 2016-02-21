@@ -30,9 +30,9 @@ class ExecutionDataValidator(BulkUpdateValidator):
 		assert len(update['targets']) == 1
 		assert isinstance(update['values'], dict)
 
-		db = app.data.driver.db
+		db      = app.data.driver.db
 		task_id = update['targets'][0]
-		task = find_by_id('tasks', task_id, db)
+		task    = find_by_id('tasks', task_id, db)
 
 		assert task[config.ID_FIELD] == task_id
 		assert task is not None
@@ -46,24 +46,21 @@ class ExecutionDataValidator(BulkUpdateValidator):
 		"""
 		This branch is taken if the ``execution_data`` entry for this task has not been
 		created yet. After validation, a callback registered with an event hook will create
-		a new entry.
+		a new entry. Since no previous ``execution_data`` exists, we must validate with
+		``original_ids`` and ``original_documents`` both set to ``None`` (the default).
 		"""
 		if 'execution_data_id' not in task:
 			return super().validate_update_content(updates)
 
 		target_id = task['execution_data_id']
-		target = find_by_id('execution_info', target_id, db)
-
-		"""
-		This branch is taken if the current ``execution_data`` entry for this task is out of
-		date (i.e. a worker attempted to run this task before, but failed). After
-		validation, a callback registered with an event hook will create a new entry.
-		"""
-		if target['retry_count'] != task['retry_count']:
-			return super().validate_update_content(updates)
+		target    = find_by_id('execution_info', target_id, db)
+		assert target['attempt_count'] == task['attempt_count']
 
 		return super().validate_update_content(updates, original_ids=[target_id],
 			original_documents=[target])
+
+def is_exit_success(exit_status):
+	return exit_status == 'success'
 
 def make_update(updates, db):
 	"""
@@ -77,9 +74,9 @@ def make_update(updates, db):
 	assert len(update['targets']) == 1
 	assert isinstance(update['values'], dict)
 
-	db = app.data.driver.db
+	db      = app.data.driver.db
 	task_id = update['targets'][0]
-	task = find_by_id('tasks', task_id, db)
+	task    = find_by_id('tasks', task_id, db)
 
 	assert task[config.ID_FIELD] == task_id
 	assert task is not None

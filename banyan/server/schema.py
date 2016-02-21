@@ -92,8 +92,8 @@ execution_data = {
 		'readonly': True
 	},
 
-	# Note that the retry count must be a positive integer.
-	'retry_count': {
+	# Describes which execution attempt that this record is associated with.
+	'attempt_count': {
 		'type': 'integer',
 		'min': 1,
 		'readonly': True
@@ -106,7 +106,13 @@ execution_data = {
 		'createonly': True
 	},
 
-	'exit_status': {'type': 'integer', 'createonly': True},
+	'exit_status': {
+		'type': 'string',
+		'maxlength': max_name_string_length,
+		'empty': False,
+		'createonly': True
+	},
+
 	'time_started': {'type': 'datetime', 'createonly': True},
 	'time_terminated': {'type': 'datetime', 'createonly': True}
 }
@@ -216,19 +222,18 @@ tasks = {
 
 		# The number of times we will put a task back on the queue if we find that it
 		# terminates unsuccessfully.
-		'max_retry_count': {
+		'max_attempt_count': {
 			'type': 'integer',
-			'min': 0,
-			'default': default_max_retry_count,
+			'min': 1,
+			'default': default_max_attempts,
 			'dependencies': ['command'],
 			'mutable_iff_inactive': True
 		},
 
 		# Information managed by the server.
 
-		# The number of times this task has been rerun after terminating unsuccessfully.
-		# Once this counter reaches `max_retry_count`, # this task will no longer be rerun.
-		'retry_count': {
+		# The number of times a worker has attempted to run this task.
+		'attempt_count': {
 			'type': 'integer',
 			'min': 0,
 			'default': 0,

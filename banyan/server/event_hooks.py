@@ -15,6 +15,7 @@ from banyan.server.lock import lock
 from banyan.server.state import legal_provider_transitions
 from banyan.server.schema import virtual_resources
 from banyan.server.mongo_common import find_by_id, update_by_id
+from banyan.server.execution_data import is_exit_success
 import banyan.server.continuations as continuations
 
 item_level_virtual_resources = set()
@@ -150,30 +151,47 @@ def process_continuations(updates, original):
 		for x in cont_list:
 			continuations.cancel(x, db)
 	elif updates['state'] == 'terminated':
-		# This branch won't be taken if the task is empty (i.e. has no command).
 		if 'execution_data_id' in original:
-			"""
-			We don't cancel the continuations on unsuccessful termination, because this
-			would defeat the purpose of the retry count.
-			"""
-			if g.virtual_resource_updates['update_execution_data']['exit_status'] != 0:
+			execution_data = g.virtual_resource_updates['update_execution_data']
+			exit_status    = execution_data['exit_status']
+
+			if is_exit_success(exit_status):
+				for x in cont_list:
+					continuations.release(x, db)
 				return
 
-		for x in cont_list:
-			continuations.release(x, db)
+			attempt_count     = original['attempt_count']
+			max_attempt_count = original['max_attempt_count']
+			assert attempt_count <= max_attempt_count
+
+			if attempt_count < max_attempt_count:
+				return
+			else:
+				for x in cont_list:
+					continuations.cancel(x, db, assert_inactive=True)
+		else:
+			"""
+			If this branch is taken, then it means that the terminated task had no
+			command (i.e. its purpose was only to group together a set of
+			continuations). In this case, termination is always considered successful,
+			and we release all of the continuations.
+			"""
+			for x in cont_list:
+				continuations.release(x, db)
+			
 
 def update_execution_data(updates, original):
 	"""
 	If a task is set to 'running' *for the first time*, then the following changes are made:
 
-	- The retry count is incremented.
+	- The attempt count is incremented.
 	- A new instance of execution data is inserted into `execution_info`,
 	  along with the fields specified in `update_execution_data`.
 
-	If a task is set to 'terminated' and its retry count is less than its maximum retry count,
-	then the following changes are made:
+	If a task is set to 'terminated' and its attempt count is less than its maximum attempt
+	count, then the following changes are made:
 
-	- The retry count is incremented.
+	- The attempt count is incremented.
 	- The state of the task is set to `available`.
 	- A new instance of execution data is inserted into `execution_info`.
 
@@ -185,31 +203,31 @@ def update_execution_data(updates, original):
 	data_updates = g.virtual_resource_updates.get('update_execution_data')
 
 	if 'state' in updates:
-		retry_count = original['retry_count']
-		max_retry_count = original['max_retry_count']
+		attempt_count = original['attempt_count']
+		max_attempt_count = original['max_attempt_count']
 
-		if updates['state'] == 'running' and retry_count == 0:
+		if updates['state'] == 'running' and attempt_count == 0:
 			assert data_updates is not None
-			new_data = {'task': id_, 'retry_count': 1}
+			new_data = {'task': id_, 'attempt_count': 1}
 			new_data.update(data_updates)
 			data_id = db.execution_info.insert(new_data)
 
 			update_by_id('tasks', id_, db, {
-				'$set': {'retry_count': 1, 'execution_data_id': data_id}
+				'$set': {'attempt_count': 1, 'execution_data_id': data_id}
 			})
 			return
 
-		if updates['state'] == 'terminated' and retry_count <= max_retry_count:
-			if data_updates is None or data_updates['exit_status'] == 0:
+		if updates['state'] == 'terminated' and attempt_count < max_attempt_count:
+			if data_updates is None or is_exit_success(data_updates['exit_status']):
 				pass
 			else:
 				update_by_id('execution_info', original['execution_data_id'], db,
 					{'$set': data_updates})
-				new_data = {'task': id_, 'retry_count': retry_count + 1}
+				new_data = {'task': id_, 'attempt_count': attempt_count + 1}
 				data_id = db.execution_info.insert(new_data)
 
 				update_by_id('tasks', id_, db, {
-					'$inc': {'retry_count': 1},
+					'$inc': {'attempt_count': 1},
 					'$set': {'state': 'available', 'execution_data_id': data_id}
 				})
 				return
