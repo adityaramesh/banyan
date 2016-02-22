@@ -8,7 +8,7 @@ Configuration settings for Eve.
 """
 
 import os
-from banyan.server.schema import tasks, execution_info, resource_usage
+from banyan.server.schema import tasks, execution_info
 from config.settings import mongo_port, max_task_set_size
 
 # XXX: remove after testing.
@@ -30,6 +30,5 @@ HATEOAS  = False
 
 DOMAIN = {
 	'tasks': tasks,
-	'execution_info': execution_info,
-	'resource_usage': resource_usage
+	'execution_info': execution_info
 }

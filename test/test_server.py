@@ -1184,10 +1184,10 @@ if __name__ == '__main__':
 	suite = unittest.TestSuite()
 
 	with scoped_credentials(db) as cred:
-		#suite.addTest(make_suite(TestAuthorization, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestAuthorization, entry=entry, cred=cred, db=db))
 		suite.addTest(make_suite(TestTaskCreation, entry=entry, cred=cred, db=db))
-		#suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
-		#suite.addTest(make_suite(TestCancellation, entry=entry, cred=cred, db=db))
-		#suite.addTest(make_suite(TestTermination, entry=entry, cred=cred, db=db))
-		#suite.addTest(make_suite(TestFilterQuery, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestCancellation, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestTermination, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestFilterQuery, entry=entry, cred=cred, db=db))
 		unittest.TextTestRunner().run(suite)

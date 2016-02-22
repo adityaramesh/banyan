@@ -123,7 +123,69 @@ execution_data = {
 	},
 
 	'time_started': {'type': 'datetime', 'createonly': True},
-	'time_terminated': {'type': 'datetime', 'createonly': True}
+	'time_terminated': {'type': 'datetime', 'createonly': True},
+
+	# Resource usage statistics. 
+
+	'last_update': {'type': 'datetime'},
+
+	'memory': {
+		'type': 'dict',
+		'schema': {
+			'resident_memory_bytes': {
+				'type': 'integer',
+				'required': True,
+				'min': 0
+			},
+
+			'virtual_memory_bytes': {
+				'type': 'integer',
+				'required': True,
+				'min': 0
+			}
+		}
+	},
+
+	'cpu_usage': {
+		'type': 'dict',
+		'schema': {
+			# It would be nice to have per-core CPU usage, but ``psutil`` does
+			# not provide a function for this as of the time of writing.
+			'utilization_percent': {
+				'type': 'float',
+				'required': True,
+				'min': 0
+			}
+
+			# It would be nice to have a list of cores on which the process is
+			# running, but obtaining this information is not trivial (even htop
+			# does not provide this).
+
+			# TODO: support for NUMA topologies using ``libnuma``?
+		}
+	},
+
+	# This can only be obtained from Tesla GPUs.
+	'gpu_usage': {
+		'type': 'list',
+		'schema': {
+			'type': 'dict',
+			'schema': {
+				'ordinal': {
+					'type': 'integer',
+					'required': True,
+					'min': 0
+				},
+
+				# Obtained from ``nvmlDeviceGetComputeRunningProcesses``.
+				'used_memory_bytes': {
+					'type': 'integer',
+					'required': True,
+					'min': 0
+				}
+			}
+		}
+	}
 }
 
 tasks = {
@@ -279,81 +341,48 @@ execution_info = {
 	'schema': execution_data
 }
 
-resource_usage = {
+registered_workers = {
 	'authentication': TokenAuth,
 	'resource_methods': ['GET', 'POST'],
 	'item_methods': ['GET'],
-	'allowed_read_roles': ['provider', 'worker'],
-	'allowed_write_roles': ['worker'],
+	'allowed_read_roles': ['provider'],
+	'allowed_write_roles': ['provider'],
 
 	'schema': {
-		'execution_data_id': {
+		'worker_id': {
 			'type': 'objectid',
-			'data_relation': {'resource': 'execution_info'},
-			'required': True
+			'data_relation': {'resource': 'users'},
+			'required': True,
+			'createonly': True
 		},
 
-		'time': {
-			'type': 'datetime',
-			'required': True
-		},
-
-		'memory': {
+		'address': {
 			'type': 'dict',
+			'required': True,
+			'createonly': True,
+
 			'schema': {
-				'resident_memory_bytes': {
-					'type': 'integer',
-					'required': True,
-					'min': 0
+				'ip': {
+					'type': 'string',
+					'empty': False,
+					'required': True
 				},
 
-				'virtual_memory_bytes': {
+				'port': {
 					'type': 'integer',
-					'required': True,
-					'min': 0
+					'min': 1,
+					'max': 2 ** 16 - 1,
+					'required': True
 				}
 			}
 		},
 
-		'cpu_usage': {
-			'type': 'dict',
-			'schema': {
-				# It would be nice to have per-core CPU usage, but ``psutil`` does
-				# not provide a function for this as of the time of writing.
-				'utilization_percent': {
-					'type': 'float',
-					'required': True,
-					'min': 0
-				}
-
-				# It would be nice to have a list of cores on which the process is
-				# running, but obtaining this information is not trivial (even htop
-				# does not provide this).
-
-				# TODO: support for NUMA topologies using ``libnuma``?
-			}
-		},
-
-		# This can only be obtained from Tesla GPUs.
-		'gpu_usage': {
+		'roles': {
 			'type': 'list',
-			'schema': {
-				'type': 'dict',
-				'schema': {
-					'ordinal': {
-						'type': 'integer',
-						'required': True,
-						'min': 0
-					},
-
-					# Obtained from ``nvmlDeviceGetComputeRunningProcesses``.
-					'used_memory_bytes': {
-						'type': 'integer',
-						'required': True,
-						'min': 0
-					}
-				}
-			}
+			'default': ['claim', 'report'],
+			'allowed': ['claim', 'report'],
+			'required': True,
+			'readonly': True
 		}
 	}
 }
