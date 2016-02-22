@@ -37,8 +37,7 @@ def make_token():
 	.. _here: http://stackoverflow.com/a/2257449/414271
 	"""
 
-	return ''.join(SystemRandom().choice(string.ascii_letters + string.digits + \
-		string.punctuation.replace(':', '')) for _ in range(16))
+	return ''.join(SystemRandom().choice(string.ascii_letters) for _ in range(16))
 
 def authorization_key(token):
 	"""

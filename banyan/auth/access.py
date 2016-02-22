@@ -11,6 +11,11 @@ from argparse import ArgumentParser
 from pprint import pprint
 from pymongo import MongoClient, DESCENDING
 
+# Allows us to import the 'banyan' module.
+import os
+import sys
+sys.path.insert(1, os.path.join(sys.path[0], '../..'))
+
 from banyan.common import make_token, authorization_key
 
 def parse_args():
@@ -32,10 +37,34 @@ def ensure_indices(db):
 	db.users.create_index('name', unique=True)
 	db.users.create_index('token')
 
-def add_user(name, token, role, db):
+def add_provider(name, request_token, db):
 	if db.users.find_one({'name': name}):
 		raise RuntimeError("User with name '{}' already exists.".format(name))
-	db.users.insert({'name': name, 'token': token, 'role': role})
+
+	db.users.insert({
+		'name': name,
+		'request_token': request_token,
+		'role': 'provider'
+	})
+
+def add_worker(name, request_token, response_token, db):
+	"""
+	Args:
+		request_token: Used by the server to validate the authenticity of an update from a
+			worker.
+		response_token: Used by the worker to determine whether a server attempting to
+			esablish a connection with it is authorized to do so.
+	"""
+
+	if db.users.find_one({'name': name}):
+		raise RuntimeError("User with name '{}' already exists.".format(name))
+
+	db.users.insert({
+		'name': name,
+		'response_token': response_token,
+		'request_token': request_token,
+		'role': 'worker'
+	})
 
 def remove_user(name, db):
 	"""
@@ -47,7 +76,7 @@ def remove_user(name, db):
 
 def list_users(db):
 	for u in db.users.find().sort('name', DESCENDING):
-		u['authorization_key'] = authorization_key(u['token'])
+		u['authorization_key'] = authorization_key(u['request_token'])
 		pprint(u)
 
 if __name__ == '__main__':
@@ -56,7 +85,10 @@ if __name__ == '__main__':
 	ensure_indices(db)
 
 	if args.action == 'add':
-		add_user(args.name, make_token(), args.role, db)
+		if args.role == 'provider':
+			add_provider(args.name, make_token(), db)
+		else:
+			add_worker(args.name, make_token(), make_token(), db)
 	elif args.action == 'remove':
 		remove_user(args.name, db)
 	elif args.action == 'list':

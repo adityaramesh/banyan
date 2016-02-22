@@ -14,7 +14,7 @@ from eve.auth import TokenAuth as TokenAuthBase
 class TokenAuth(TokenAuthBase):
 	def check_auth(self, token, allowed_roles, resource, method):
 		db = app.data.driver.db
-		res = db.users.find_one({'token': token}, {'role': True})
+		res = db.users.find_one({'request_token': token}, {'role': True})
 
 		"""
 		Save the token and associated user, in case they will be needed later during
@@ -30,7 +30,7 @@ class TokenAuth(TokenAuthBase):
 class RestrictCreationToProviders(TokenAuthBase):
 	def check_auth(self, token, allowed_roles, resource, method):
 		db = app.data.driver.db
-		res = db.users.find_one({'token': token}, {'role': True})
+		res = db.users.find_one({'request_token': token}, {'role': True})
 
 		"""
 		Save the token and associated user, in case they will be needed later during

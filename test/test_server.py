@@ -30,11 +30,11 @@ class Credentials():
 		self.worker_name = 'test_worker'
 		self.worker_token = access.make_token()
 
-		access.add_user(self.provider_name, self.provider_token, 'provider', self.db)
-		access.add_user(self.worker_name, self.worker_token, 'worker', self.db)
+		access.add_provider(self.provider_name, self.provider_token, self.db)
+		access.add_worker(self.worker_name, self.worker_token, make_token(), self.db)
 
-		self.provider_key = access.authorization_key(self.provider_token)
-		self.worker_key = access.authorization_key(self.worker_token)
+		self.provider_key = authorization_key(self.provider_token)
+		self.worker_key = authorization_key(self.worker_token)
 
 	def revoke(self):
 		access.remove_user('test_provider', self.db)
