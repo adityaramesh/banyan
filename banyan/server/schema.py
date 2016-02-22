@@ -13,8 +13,7 @@ import banyan.server.continuations as continuations
 import banyan.server.execution_data as execution_data_
 
 from banyan.server.constants import *
-from banyan.server.authentication import TokenAuth, RestrictAccessToProviders, \
-	RestrictCreationToProviders
+from banyan.server.authentication import TokenAuth, RestrictCreationToProviders
 
 """
 XXX: Don't use multiline strings to write comments inside of dicts, because the
@@ -272,10 +271,10 @@ tasks = {
 }
 
 execution_info = {
-	'authentication': RestrictAccessToProviders,
-	'resource_methods': ['GET', 'POST'],
-	'item_methods': ['GET', 'PATCH'],
-	'allowed_read_roles': ['provider', 'worker'],
+	'authentication': TokenAuth,
+	'resource_methods': ['GET'],
+	'item_methods': ['GET'],
+	'allowed_read_roles': ['provider'],
 	'allowed_write_roles': [],
 	'schema': execution_data
 }

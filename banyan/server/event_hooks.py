@@ -9,6 +9,7 @@ Provides the event hooks that implement the server-side functionality.
 
 import json
 from bson import ObjectId
+from werkzeug.exceptions import HTTPException
 from flask import g, current_app as app
 from eve.utils import config
 
@@ -45,7 +46,8 @@ def acquire_lock_if_necessary(request, lookup):
 	g.lock_owner = False
 
 def release_lock_if_necessary(request, payload):
-	if g.lock_owner:
+	# XXX
+	if hasattr(g, 'lock_owner') and g.lock_owner:
 		assert lock.locked()
 		lock.release()
 
@@ -247,7 +249,7 @@ def update_execution_data(updates, original):
 		update_by_id('execution_info', data_id, db, {'$set': data_updates})
 
 def append_execution_data_token(request, payload):
-	if not hasattr(g, 'task_id'):
+	if not hasattr(g, 'task_id') or payload.status_code != 200:
 		return
 
 	db = app.data.driver.db
@@ -275,7 +277,22 @@ def register(app):
 	app.on_updated_tasks += process_continuations
 	app.on_updated_tasks += update_execution_data
 
+
+	"""
+	When this flag is false (the default value), exceptions which are instances of
+	``HTTPException`` are handled by functions decorated with ``errorhandler(n)``, where ``n``
+	is the HTTP error code. When this flag is true, instances of ``HTTPException`` can be
+	handled by the regular error handlers. See `this SO answer`_ for more information.
+
+	.. _this SO answer: http://stackoverflow.com/a/33711404/414271
+	"""
+	app.config['TRAP_HTTP_EXCEPTIONS'] = True
+
 	@app.errorhandler(Exception)
 	def handle_error(error):
 		release_lock_if_necessary(None, None)
-		raise error
+
+		if isinstance(error, HTTPException):
+			return error
+		else:
+			raise

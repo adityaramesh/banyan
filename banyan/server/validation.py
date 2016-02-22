@@ -7,12 +7,13 @@ banyan.server.validation
 Defines custom validators for resource schema.
 """
 
-from flask import g, current_app as app
+from flask import Response, abort, g, current_app as app
 from eve.methods.common import serialize
 import eve.io.mongo
 
 from banyan.server.state import legal_provider_transitions, legal_worker_transitions
 from banyan.server.constants import *
+from banyan.server.mongo_common import find_by_id
 
 class ValidatorBase(eve.io.mongo.Validator):
 	"""
@@ -108,6 +109,19 @@ class ValidatorBase(eve.io.mongo.Validator):
 
 		return True
 
+	def validate_execution_data_token(self, document, original_document):
+		ex_data = document['update_execution_data']
+
+		if not 'token' in ex_data:
+			abort(401, description="Workers must provide the execution data token in "
+				"order to update the task status.")
+
+		ex_data_id = original_document['execution_data_id']
+		orig_ex_data = find_by_id('execution_info', ex_data_id, self.db, {'token': True})
+
+		if ex_data['token'] != orig_ex_data['token']:
+			abort(403, description="Provided execution data token does not match.")
+
 	def validate_state_change(self, final_state, update, required_fields):
 		def fail():
 			self._error('state', "State cannot be changed to '{}' without setting "
@@ -131,9 +145,15 @@ class ValidatorBase(eve.io.mongo.Validator):
 
 		# The authorization token and corresponding user are set by the authenticator.
 		assert g.user is not None
-		role = g.user['role']
 
-		if 'state' in document:
+		role           = g.user['role']
+		state_update   = 'state' in document
+		ex_data_update = 'update_execution_data' in document
+
+		if ex_data_update and (not state_update or document['state'] != 'running'):
+			self.validate_execution_data_token(document, original_document)
+
+		if state_update:
 			si = original_document['state']
 			sf = document['state']
 
@@ -153,7 +173,7 @@ class ValidatorBase(eve.io.mongo.Validator):
 				if not self.validate_state_change(sf, document,
 						required_fields={'exit_status', 'time_terminated'}):
 					return False
-		elif 'update_execution_data' in document:
+		elif ex_data_update:
 			keys = set(document['update_execution_data'].keys())
 			special_keys = {'worker', 'exit_status', 'time_terminated'}
 			common_keys = keys & special_keys

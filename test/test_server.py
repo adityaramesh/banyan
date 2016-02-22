@@ -72,14 +72,13 @@ class TestAuthorization(unittest.TestCase):
 
 		for key in keys_without_write_access:
 			resp = post({}, self.entry, key, endpoint)
-			self.assertEqual(resp.status_code, requests.codes.unauthorized)
+			self.assertEqual(resp.status_code in [401, 405], True)
 
 	def test_endpoint_access(self):
 		pk = self.cred.provider_key
 		wk = self.cred.worker_key
 
 		self._endpoint_access_impl('tasks', [None, wk])
-		self._endpoint_access_impl('execution_info', [None, pk])
 		self._endpoint_access_impl('execution_info', [None, wk, pk])
 
 class TestTaskCreation(unittest.TestCase):
@@ -501,6 +500,7 @@ class TestExecutionInfo(unittest.TestCase):
 
 		# Test that claiming tasks works when performed correctly.
 		resp = claim_task(task_ids[2])
+		token = resp.json()['token']
 		self.assertEqual(resp.status_code, requests.codes.ok)
 
 		"""
@@ -509,15 +509,15 @@ class TestExecutionInfo(unittest.TestCase):
 		"""
 
 		good_updates = [
-			{'time_started': 'Tue, 02 Apr 2013 10:29:13 GMT'}
+			{'time_started': 'Tue, 02 Apr 2013 10:29:13 GMT', 'token': token}
 		]
 
 		bad_updates = [
-			{'task': task_ids[0]},
-			{'attempt_count': 2},
-			{'worker': ''},
-			{'exit_status': 'success'},
-			{'time_terminated': 'Tue, 02 Apr 2013 10:29:13 GMT'}
+			{'task': task_ids[0], 'token': token},
+			{'attempt_count': 2, 'token': token},
+			{'worker': '', 'token': token},
+			{'exit_status': 'success', 'token': token},
+			{'time_terminated': 'Tue, 02 Apr 2013 10:29:13 GMT', 'token': token}
 		]
 
 		def update_execution_data(update):
@@ -1126,10 +1126,10 @@ if __name__ == '__main__':
 	suite = unittest.TestSuite()
 
 	with scoped_credentials(db) as cred:
-		#suite.addTest(make_suite(TestAuthorization, entry=entry, cred=cred, db=db))
-		#suite.addTest(make_suite(TestTaskCreation, entry=entry, cred=cred, db=db))
-		#suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
-		#suite.addTest(make_suite(TestCancellation, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestAuthorization, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestTaskCreation, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestCancellation, entry=entry, cred=cred, db=db))
 		suite.addTest(make_suite(TestTermination, entry=entry, cred=cred, db=db))
-		#suite.addTest(make_suite(TestFilterQuery, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestFilterQuery, entry=entry, cred=cred, db=db))
 		unittest.TextTestRunner().run(suite)
