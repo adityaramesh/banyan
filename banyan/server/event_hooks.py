@@ -46,7 +46,6 @@ def acquire_lock_if_necessary(request, lookup):
 	g.lock_owner = False
 
 def release_lock_if_necessary(request, payload):
-	# XXX
 	if hasattr(g, 'lock_owner') and g.lock_owner:
 		assert lock.locked()
 		lock.release()
