@@ -194,6 +194,7 @@ class TestTaskCreation(unittest.TestCase):
 		self._test_state_updates()
 		self._test_resource_updates()
 		self._test_continuation_updates()
+		self._test_simultaneous_addition_and_removal()
 
 	def _test_state_updates(self):
 		drop_tasks(self.db)
@@ -455,6 +456,63 @@ class TestTaskCreation(unittest.TestCase):
 		for child_id in child_ids[:2]:
 			resp = get(self.entry, self.cred.provider_key, 'tasks', child_id)
 			self.assertEqual(resp.json()['pending_dependency_count'], 1)
+
+	def _test_simultaneous_addition_and_removal(self):
+		drop_tasks(self.db)
+
+		parents = [
+			{
+				'name': 'parent 1',
+				'command': 'ls',
+				'requested_resources': {}
+			}
+		]
+
+		children = [
+			{
+				'name': 'child 1',
+				'command': 'ls',
+				'requested_resources': {}
+			},
+			{
+				'name': 'child 2',
+				'command': 'ls',
+				'requested_resources': {}
+			}
+		]
+
+		parent_ids = []
+		child_ids = []
+
+		for i, parent in enumerate(parents):
+			resp = post(parent, self.entry, self.cred.provider_key, 'tasks')
+			json = resp.json()
+			self.assertEqual(resp.status_code, requests.codes.created)
+			parent_ids.append(json['_id'])
+
+		for i, child in enumerate(children):
+			resp = post(child, self.entry, self.cred.provider_key, 'tasks')
+			json = resp.json()
+			self.assertEqual(resp.status_code, requests.codes.created)
+			child_ids.append(json['_id'])
+
+		def add_remove_cont(child_ids, parent_id, key):
+			return patch({
+				'add_continuations': child_ids,
+				'remove_continuations': child_ids
+			}, self.entry, key, 'tasks', parent_id)
+
+		for parent_id in parent_ids:
+			resp = add_remove_cont(child_ids, parent_id, self.cred.provider_key)
+			self.assertEqual(resp.status_code, requests.codes.ok)
+
+			resp = get(self.entry, self.cred.provider_key, 'tasks', parent_id)
+			self.assertEqual(len(resp.json()['continuations']), 0)
+
+		for child_id in child_ids:
+			resp = get(self.entry, self.cred.provider_key, 'tasks', child_id)
+			self.assertEqual(resp.json()['state'], 'inactive')
+			self.assertEqual(resp.json()['pending_dependency_count'], 0)
 
 class TestExecutionInfo(unittest.TestCase):
 	"""
@@ -1126,10 +1184,10 @@ if __name__ == '__main__':
 	suite = unittest.TestSuite()
 
 	with scoped_credentials(db) as cred:
-		suite.addTest(make_suite(TestAuthorization, entry=entry, cred=cred, db=db))
+		#suite.addTest(make_suite(TestAuthorization, entry=entry, cred=cred, db=db))
 		suite.addTest(make_suite(TestTaskCreation, entry=entry, cred=cred, db=db))
-		suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
-		suite.addTest(make_suite(TestCancellation, entry=entry, cred=cred, db=db))
-		suite.addTest(make_suite(TestTermination, entry=entry, cred=cred, db=db))
-		suite.addTest(make_suite(TestFilterQuery, entry=entry, cred=cred, db=db))
+		#suite.addTest(make_suite(TestExecutionInfo, entry=entry, cred=cred, db=db))
+		#suite.addTest(make_suite(TestCancellation, entry=entry, cred=cred, db=db))
+		#suite.addTest(make_suite(TestTermination, entry=entry, cred=cred, db=db))
+		#suite.addTest(make_suite(TestFilterQuery, entry=entry, cred=cred, db=db))
 		unittest.TextTestRunner().run(suite)
