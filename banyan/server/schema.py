@@ -86,7 +86,7 @@ All fields are marked 'readonly`, because they can only be modified via the 'upd
 virtual resource of the 'tasks' endpoint.
 """
 execution_data = {
-	'task': {
+	'task_id': {
 		'type': 'objectid',
 		'data_relation': {'resource': 'tasks'},
 		'readonly': True
@@ -287,9 +287,9 @@ resource_usage = {
 	'allowed_write_roles': ['worker'],
 
 	'schema': {
-		'task': {
+		'execution_data_id': {
 			'type': 'objectid',
-			'data_relation': {'resource': 'tasks'},
+			'data_relation': {'resource': 'execution_info'},
 			'required': True
 		},
 

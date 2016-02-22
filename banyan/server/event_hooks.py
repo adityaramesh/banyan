@@ -218,7 +218,12 @@ def update_execution_data(updates, original):
 		if updates['state'] == 'running':
 			if attempt_count == 0:
 				assert data_updates is not None
-				new_data = {'task': id_, 'attempt_count': 1, 'token': make_token()}
+				new_data = {
+					'task_id': id_,
+					'attempt_count': 1,
+					'token': make_token()
+				}
+
 				new_data.update(data_updates)
 				data_id = db.execution_info.insert(new_data)
 
@@ -233,8 +238,11 @@ def update_execution_data(updates, original):
 			else:
 				update_by_id('execution_info', original['execution_data_id'], db,
 					{'$set': data_updates})
-				new_data = {'task': id_, 'attempt_count': attempt_count + 1,
-					'token': make_token()}
+				new_data = {
+					'task_id': id_,
+					'attempt_count': attempt_count + 1,
+					'token': make_token()
+				}
 
 				data_id = db.execution_info.insert(new_data)
 				update_by_id('tasks', id_, db, {
