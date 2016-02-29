@@ -343,7 +343,7 @@ execution_info = {
 
 registered_workers = {
 	'authentication': TokenAuth,
-	'resource_methods': ['GET', 'POST'],
+	'resource_methods': ['GET', 'POST', 'DELETE'],
 	'item_methods': ['GET'],
 	'allowed_read_roles': ['provider'],
 	'allowed_write_roles': ['provider'],

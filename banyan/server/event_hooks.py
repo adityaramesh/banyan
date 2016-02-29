@@ -271,6 +271,16 @@ def register(app):
 	app.on_pre_POST_tasks  += acquire_lock
 	app.on_post_POST_tasks += release_lock_if_necessary
 
+	"""
+	We also need to synchronize registration/unregistration of workers, since this could
+	potentially trigger races with authentication or validation when checking worker
+	permissions.
+	"""
+	app.on_pre_POST_registered_workers    += acquire_lock
+	app.on_post_POST_registered_workers   += release_lock_if_necessary
+	app.on_pre_DELETE_registered_workers  += acquire_lock
+	app.on_post_DELETE_registered_workers += release_lock_if_necessary
+
 	app.on_pre_PATCH_tasks  += acquire_lock_if_necessary
 	app.on_pre_PATCH_tasks  += modify_state_changes
 	app.on_post_PATCH_tasks += append_execution_data_token
@@ -283,7 +293,6 @@ def register(app):
 	app.on_update_tasks  += filter_virtual_resources
 	app.on_updated_tasks += process_continuations
 	app.on_updated_tasks += update_execution_data
-
 
 	"""
 	When this flag is false (the default value), exceptions which are instances of
