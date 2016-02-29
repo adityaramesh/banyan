@@ -55,6 +55,22 @@ def scoped_credentials(db):
 def drop_tasks(db):
 	db.drop_collection('tasks')
 
+def insert_tasks(self, tasks, expected_codes=None, id_list=None):
+	for i, task in enumerate(tasks):
+		resp = post(task, self.entry, self.cred.provider_key, 'tasks')
+
+		if not expected_codes:
+			self.assertEqual(resp.status_code, requests.codes.created)
+		else:
+			self.assertEqual(resp.status_code, expected_codes[i])
+
+		if id_list is not None:
+			id_list.append(resp.json()['_id'])
+
+def add_continuations(self, child_ids, parent_id):
+	return post(child_ids, self.entry, self.cred.provider_key, 'tasks', parent_id,
+		'add_continuations')
+
 class TestAuthorization(unittest.TestCase):
 	"""
 	Tests that unauthorized requests to all endpoints fail.
@@ -66,7 +82,7 @@ class TestAuthorization(unittest.TestCase):
 		self.db = db
 		self.cred = cred
 
-	def _endpoint_access_impl(self, endpoint, keys_without_write_access):
+	def _test_endpoint_access_impl(self, endpoint, keys_without_write_access):
 		resp = get(self.entry, None, endpoint)
 		self.assertEqual(resp.status_code, requests.codes.unauthorized)
 
@@ -78,8 +94,8 @@ class TestAuthorization(unittest.TestCase):
 		pk = self.cred.provider_key
 		wk = self.cred.worker_key
 
-		self._endpoint_access_impl('tasks', [None, wk])
-		self._endpoint_access_impl('execution_info', [None, wk, pk])
+		self._test_endpoint_access_impl('tasks', [None, wk])
+		self._test_endpoint_access_impl('execution_info', [None, wk, pk])
 
 class TestTaskCreation(unittest.TestCase):
 	"""
@@ -99,62 +115,50 @@ class TestTaskCreation(unittest.TestCase):
 	def _test_creation_without_continuations(self):
 		drop_tasks(self.db)
 
-		ops = [
-			(
-				{'name': 'test 1'},
-				requests.codes.created
-			),
-			(
-				{'command': 'test'},
-				# Because ``requested_resources`` is required.
-				requests.codes.unprocessable_entity
-			),
-			(
-				{'name': 'test 3', 'command': 'test'},
-				requests.codes.unprocessable_entity
-			),
-			(
-				{
-					'name': 'test 4',
-					'command': 'test',
-					'requested_resources': {
-						'cpu_memory_bytes': 64 * 2**30
-					}
-				},
-				requests.codes.created
-			),
-			(
-				{
-					'name': 'test 5',
-					'command': 'test',
-					'requested_resources': {
-						'cpu_memory_bytes': 64 * 2**30,
-						'cpu_cores': {'count': 8}
-					}
-				},
-				requests.codes.created
-			),
-			(
-				{
-					'name': 'test 6',
-					'command': 'test',
-					'requested_resources': {
-						'cpu_memory_bytes': 64 * 2**30,
-						'cpu_cores': {'count': 8},
+		tasks = [
+			{'name': 'test 1'},
+			{'command': 'test'},
+			{'name': 'test 3', 'command': 'test'},
+			{
+				'name': 'test 4',
+				'command': 'test',
+				'requested_resources': {
+					'cpu_memory_bytes': 64 * 2**30
+				}
+			},
+			{
+				'name': 'test 5',
+				'command': 'test',
+				'requested_resources': {
+					'cpu_memory_bytes': 64 * 2**30,
+					'cpu_cores': {'count': 8}
+				}
+			},
+			{
+				'name': 'test 6',
+				'command': 'test',
+				'requested_resources': {
+					'cpu_memory_bytes': 64 * 2**30,
+					'cpu_cores': {'count': 8},
 
-						'gpu_count': 1,
-						'gpu_memory_bytes': 8 * 2**30,
-						'gpu_compute_capability_major': 5,
-						'gpu_compute_capability_minor': 0
-					}
-				},
-				requests.codes.created
-			)
+					'gpu_count': 1,
+					'gpu_memory_bytes': 8 * 2**30,
+					'gpu_compute_capability_major': 5,
+					'gpu_compute_capability_minor': 0
+				}
+			}
 		]
 
-		for task, expected_status in ops:
-			resp = post(task, self.entry, self.cred.provider_key, 'tasks')
-			self.assertEqual(resp.status_code, expected_status)
+		expected_codes = [
+			requests.codes.created,
+			requests.codes.unprocessable_entity,
+			requests.codes.unprocessable_entity,
+			requests.codes.created,
+			requests.codes.created,
+			requests.codes.created
+		]
+
+		insert_tasks(self, tasks, expected_codes=expected_codes)
 
 	def _test_creation_with_continuations(self):
 		drop_tasks(self.db)
@@ -165,25 +169,19 @@ class TestTaskCreation(unittest.TestCase):
 			{'name': 'child 2', 'state': 'available'}
 		]
 
-		for i, child in enumerate(children):
-			resp = post(child, self.entry, self.cred.provider_key, 'tasks')
-			json = resp.json()
-			self.assertEqual(resp.status_code, requests.codes.created)
+		child_ids = []
+		insert_tasks(self, children, id_list=child_ids)
 
-			if i == 0:
-				child_id = json['_id']
-
+		for i, child_id in enumerate(child_ids):
 			parents.append({
 				'name': 'parent {}'.format(i),
-				'continuations': [json['_id']]
+				'continuations': [child_id]
 			})
 
 		expected_codes = [requests.codes.created, requests.codes.unprocessable_entity]
-		for parent, code in zip(parents, expected_codes):
-			resp = post(parent, self.entry, self.cred.provider_key, 'tasks')
-			self.assertEqual(resp.status_code, code)
+		insert_tasks(self, parents, expected_codes=expected_codes)
 
-		resp = get(self.entry, self.cred.provider_key, 'tasks', child_id)
+		resp = get(self.entry, self.cred.provider_key, 'tasks', child_ids[0])
 		self.assertEqual(resp.json()['pending_dependency_count'], 1)
 
 	def test_updates(self):
@@ -213,8 +211,6 @@ class TestTaskCreation(unittest.TestCase):
 		3. If a task is not in the `inactive` state, then any attempt to modify the value of
 		   a ``readonly`` or ``createonly`` field should fail.
 		"""
-
-		drop_tasks(self.db)
 
 		changes = [
 			(
@@ -345,17 +341,8 @@ class TestTaskCreation(unittest.TestCase):
 		parent_ids = []
 		child_ids = []
 
-		for i, parent in enumerate(parents):
-			resp = post(parent, self.entry, self.cred.provider_key, 'tasks')
-			json = resp.json()
-			self.assertEqual(resp.status_code, requests.codes.created)
-			parent_ids.append(json['_id'])
-
-		for i, child in enumerate(children):
-			resp = post(child, self.entry, self.cred.provider_key, 'tasks')
-			json = resp.json()
-			self.assertEqual(resp.status_code, requests.codes.created)
-			child_ids.append(json['_id'])
+		insert_tasks(self, parents, id_list=parent_ids)
+		insert_tasks(self, children, id_list=child_ids)
 
 		def add_cont_1(child_ids, parent_id, key):
 			return post(child_ids, self.entry, key, 'tasks', parent_id,
@@ -480,17 +467,8 @@ class TestTaskCreation(unittest.TestCase):
 		parent_ids = []
 		child_ids = []
 
-		for i, parent in enumerate(parents):
-			resp = post(parent, self.entry, self.cred.provider_key, 'tasks')
-			json = resp.json()
-			self.assertEqual(resp.status_code, requests.codes.created)
-			parent_ids.append(json['_id'])
-
-		for i, child in enumerate(children):
-			resp = post(child, self.entry, self.cred.provider_key, 'tasks')
-			json = resp.json()
-			self.assertEqual(resp.status_code, requests.codes.created)
-			child_ids.append(json['_id'])
+		insert_tasks(self, parents, id_list=parent_ids)
+		insert_tasks(self, children, id_list=child_ids)
 
 		def add_remove_cont(child_ids, parent_id, key):
 			return patch({
@@ -531,12 +509,9 @@ class TestExecutionInfo(unittest.TestCase):
 			{'name': 'task 3', 'command': 'foo', 'state': 'available',
 				'requested_resources': {}}
 		]
-		task_ids = []
 
-		for task in tasks:
-			resp = post(task, self.entry, self.cred.provider_key, 'tasks')
-			self.assertEqual(resp.status_code, requests.codes.created)
-			task_ids.append(resp.json()['_id'])
+		task_ids = []
+		insert_tasks(self, tasks, id_list=task_ids)
 
 		def claim_task(task_id):
 			update = {
@@ -597,14 +572,6 @@ class TestCancellation(unittest.TestCase):
 		self.db = db
 		self.cred = cred
 
-	def _insert_tasks(self, tasks, id_list=None):
-		for task in tasks:
-			resp = post(task, self.entry, self.cred.provider_key, 'tasks')
-			self.assertEqual(resp.status_code, requests.codes.created)
-
-			if id_list is not None:
-				id_list.append(resp.json()['_id'])
-
 	def _add_continuations(self, child_ids, parent_id):
 		return post(child_ids, self.entry, self.cred.provider_key, 'tasks', parent_id,
 			'add_continuations')
@@ -631,8 +598,8 @@ class TestCancellation(unittest.TestCase):
 		parent_ids = []
 		child_ids = []
 
-		self._insert_tasks(parents, parent_ids)
-		self._insert_tasks(children, child_ids)
+		insert_tasks(self, parents, id_list=parent_ids)
+		insert_tasks(self, children, id_list=child_ids)
 
 		for parent_id in parent_ids:
 			resp = self._add_continuations(child_ids, parent_id)
@@ -685,9 +652,9 @@ class TestCancellation(unittest.TestCase):
 		child_ids = []
 		grandchild_ids = []
 
-		self._insert_tasks(parents, parent_ids)
-		self._insert_tasks(children, child_ids)
-		self._insert_tasks(grandchildren, grandchild_ids)
+		insert_tasks(self, parents, id_list=parent_ids)
+		insert_tasks(self, children, id_list=child_ids)
+		insert_tasks(self, grandchildren, id_list=grandchild_ids)
 
 		"""
 		Construct the tree of tasks, and verify that the continuation lists and dependency
@@ -752,15 +719,6 @@ class TestTermination(unittest.TestCase):
 		self.db = db
 		self.cred = cred
 
-	def _insert_tasks(self, tasks, id_list):
-		for task in tasks:
-			resp = post(task, self.entry, self.cred.provider_key, 'tasks')
-			id_list.append(resp.json()['_id'])
-
-	def _add_continuations(self, child_ids, parent_id):
-		return post(child_ids, self.entry, self.cred.provider_key, 'tasks', parent_id,
-			'add_continuations')
-
 	def test_empty_task_termination(self):
 		drop_tasks(self.db)
 
@@ -774,9 +732,9 @@ class TestTermination(unittest.TestCase):
 		parent_ids = []
 		child_ids = []
 
-		self._insert_tasks(parents, parent_ids)
-		self._insert_tasks(children, child_ids)
-		self._add_continuations(child_ids, parent_ids[0])
+		insert_tasks(self, parents, id_list=parent_ids)
+		insert_tasks(self, children, id_list=child_ids)
+		add_continuations(self, child_ids, parent_ids[0])
 
 		resp = patch({'state': 'available'}, self.entry, self.cred.provider_key, 'tasks',
 			parent_ids[0])
@@ -808,9 +766,9 @@ class TestTermination(unittest.TestCase):
 		parent_ids = []
 		child_ids = []
 
-		self._insert_tasks(parents, parent_ids)
-		self._insert_tasks(children, child_ids)
-		self._add_continuations(child_ids, parent_ids[0])
+		insert_tasks(self, parents, id_list=parent_ids)
+		insert_tasks(self, children, id_list=child_ids)
+		add_continuations(self, child_ids, parent_ids[0])
 
 		"""
 		To terminate the task, we have to have the worker first claim the task, then
@@ -873,9 +831,9 @@ class TestTermination(unittest.TestCase):
 		parent_ids = []
 		child_ids = []
 
-		self._insert_tasks(parents, parent_ids)
-		self._insert_tasks(children, child_ids)
-		self._add_continuations(child_ids, parent_ids[0])
+		insert_tasks(self, parents, id_list=parent_ids)
+		insert_tasks(self, children, id_list=child_ids)
+		add_continuations(self, child_ids, parent_ids[0])
 
 		resp = patch({'state': 'available'}, self.entry, self.cred.provider_key, 'tasks',
 			parent_ids[0])
@@ -933,9 +891,9 @@ class TestTermination(unittest.TestCase):
 		parent_ids = []
 		child_ids = []
 
-		self._insert_tasks(parents, parent_ids)
-		self._insert_tasks(children, child_ids)
-		self._add_continuations(child_ids, parent_ids[0])
+		insert_tasks(self, parents, id_list=parent_ids)
+		insert_tasks(self, children, id_list=child_ids)
+		add_continuations(self, child_ids, parent_ids[0])
 
 		resp = patch({'state': 'available'}, self.entry, self.cred.provider_key, 'tasks',
 			parent_ids[0])
@@ -1014,11 +972,11 @@ class TestTermination(unittest.TestCase):
 		parent_ids = []
 		child_ids = []
 
-		self._insert_tasks(parents, parent_ids)
-		self._insert_tasks(children, child_ids)
-		self._add_continuations(child_ids, parent_ids[0])
-		self._add_continuations(child_ids, parent_ids[1])
-		self._add_continuations(child_ids, parent_ids[2])
+		insert_tasks(self, parents, id_list=parent_ids)
+		insert_tasks(self, children, id_list=child_ids)
+		add_continuations(self, child_ids, parent_ids[0])
+		add_continuations(self, child_ids, parent_ids[1])
+		add_continuations(self, child_ids, parent_ids[2])
 
 		for parent_id in parent_ids[:2]:
 			resp = patch({'state': 'available'}, self.entry, self.cred.provider_key,
@@ -1047,11 +1005,6 @@ class TestFilterQuery(unittest.TestCase):
 		self.db = db
 		self.cred = cred
 
-	def _insert_tasks(self, tasks, id_list):
-		for task in tasks:
-			resp = post(task, self.entry, self.cred.provider_key, 'tasks')
-			id_list.append(resp.json()['_id'])
-
 	def test_memory_filter(self):
 		drop_tasks(self.db)
 
@@ -1074,7 +1027,7 @@ class TestFilterQuery(unittest.TestCase):
 		]
 
 		task_ids = []
-		self._insert_tasks(tasks, task_ids)
+		insert_tasks(self, tasks, id_list=task_ids)
 
 		query = {'requested_resources.cpu_memory_bytes': {'$lte': 2}}
 		resp = get(self.entry, self.cred.provider_key, 'tasks', where=query)
@@ -1102,7 +1055,7 @@ class TestFilterQuery(unittest.TestCase):
 		]
 
 		task_ids = []
-		self._insert_tasks(tasks, task_ids)
+		insert_tasks(self, tasks, id_list=task_ids)
 
 		query = {'requested_resources.cpu_cores.count': {'$lte': 2}}
 		resp = get(self.entry, self.cred.provider_key, 'tasks', where=query)
@@ -1155,7 +1108,7 @@ class TestFilterQuery(unittest.TestCase):
 		]
 
 		task_ids = []
-		self._insert_tasks(tasks, task_ids)
+		insert_tasks(self, tasks, id_list=task_ids)
 
 		query = {
 			'$and': [
