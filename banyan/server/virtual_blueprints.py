@@ -36,16 +36,21 @@ def make_resource_level_handler(parent_resource, virtual_resource, schema, valid
 		else:
 			roles += resource['allowed_write_roles']
 
-		auth = resource_auth(parent_resource)
-		if request.method not in public:
-			if not auth.authorized(roles, parent_resource, request.method):
-				return auth.authenticate()
-
 		issues = {}
 
 		try:
 			if synchronize:
 				lock.acquire()
+
+			"""
+			The authenticator may need to access the ``registered_workers`` database, so
+			we need to acquire the lock first to prevent races with other requests that
+			make modifications to this database.
+			"""
+			auth = resource_auth(parent_resource)
+			if request.method not in public:
+				if not auth.authorized(roles, parent_resource, request.method):
+					return auth.authenticate()
 
 			if not skip_validation:
 				validator = validator_class(schema=schema, resource=parent_resource)
