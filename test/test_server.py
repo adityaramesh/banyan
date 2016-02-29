@@ -92,10 +92,6 @@ class TestTaskCreation(unittest.TestCase):
 		self.db = db
 		self.cred = cred
 
-	# Used to drop the 'tasks' collection so that each test is independent.
-	def drop_tasks(self):
-		self.db.drop_collection('tasks')
-
 	def test_creation(self):
 		self._test_creation_without_continuations()
 		self._test_creation_with_continuations()
@@ -259,7 +255,7 @@ class TestTaskCreation(unittest.TestCase):
 
 		# Case (1).
 		for change in changes:
-			self.drop_tasks()
+			drop_tasks(self.db)
 			init, _ = change
 
 			# The RHS is the union of the arguments.
@@ -273,7 +269,7 @@ class TestTaskCreation(unittest.TestCase):
 
 		# Case (2).
 		for change in changes:
-			self.drop_tasks()
+			drop_tasks(self.db)
 			init, final = change
 
 			# The RHS is the union of the arguments.
@@ -287,7 +283,7 @@ class TestTaskCreation(unittest.TestCase):
 
 		# Case (3).
 		for change in changes:
-			self.drop_tasks()
+			drop_tasks(self.db)
 			init, final = change
 
 			# The RHS is the union of the arguments.
@@ -601,10 +597,13 @@ class TestCancellation(unittest.TestCase):
 		self.db = db
 		self.cred = cred
 
-	def _insert_tasks(self, tasks, id_list):
+	def _insert_tasks(self, tasks, id_list=None):
 		for task in tasks:
 			resp = post(task, self.entry, self.cred.provider_key, 'tasks')
-			id_list.append(resp.json()['_id'])
+			self.assertEqual(resp.status_code, requests.codes.created)
+
+			if id_list is not None:
+				id_list.append(resp.json()['_id'])
 
 	def _add_continuations(self, child_ids, parent_id):
 		return post(child_ids, self.entry, self.cred.provider_key, 'tasks', parent_id,

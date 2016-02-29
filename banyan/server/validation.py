@@ -125,7 +125,7 @@ class ValidatorBase(eve.io.mongo.Validator):
 				return False
 		return True
 
-	def validate_worker_id(self, documnet):
+	def validate_worker_id(self, document):
 		if 'worker_id' not in document:
 			return True
 
