@@ -19,7 +19,7 @@ from signalfd import SFD_NONBLOCK, SFD_CLOEXEC, SIG_UNBLOCK
 from select import EPOLLIN, EPOLLOUT, EPOLLERR, EPOLLRDHUP, EPOLLHUP, EPOLLONESHOT, EPOLL_CLOEXEC
 
 from flask import request
-from threading import Lock
+from threading import Thread, Lock
 
 shutdown_signals = {SIGHUP, SIGINT, SIGQUIT, SIGABRT, SIGTERM}
 
@@ -39,9 +39,6 @@ def close_connection(conn, how=socket.SHUT_RDWR):
 
 	conn.close()
 
-def shutdown_server():
-	request.environ.get('werkzeug.server.shutdown')()
-
 class WorkerQueue:
 	def __init__(self, name, conn):
 		self.name             = name
@@ -53,6 +50,11 @@ class WorkerQueue:
 		self.msg_queue.append(msg)
 
 	def drain(self):
+		"""
+		Sends as many messages as possible before the socket would block again. Returns the
+		length of the internal message queue after this process.
+		"""
+
 		while len(self) != 0:
 			msg = self.msg_queue[-1]
 
@@ -88,39 +90,50 @@ class WorkerNotifier:
 		return self.fd_to_wq[self.name_to_fd[name]]
 
 	def register(self, name, addr):
+		"""
+		Registers a worker so that we can send notifications to it in the future. If a
+		worker with the given name is already registered with this queue, then a
+		``RuntimeError`` is raised.
+
+		Args:
+			name: The name of the worker.
+			addr: A tuple describing the IP address and port identifying the worker with
+			name ``name``.
+		"""
+
 		try:
 			conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 			conn.connect(addr)
 			conn.setblocking(False)
 
 			with self.lock:
-				"""
-				Since we have no pending messages to send to this worker, we
-				register it without specifying any events to listen to. We will
-				still get notifications for certain kinds of errors, but we ignore
-				these, since error-checking is performed when we attempt to send a
-				message.
-				"""
-				self.epoll.register(conn, 0)
+				if name in self.name_to_fd:
+					raise RuntimeError("Worker '{}' is already registered.".
+						format(name))
 
+				self.epoll.register(conn, self.conn_event_bitmask)
 				fd = conn.fileno()
 				wq = WorkerQueue(name, conn)
 
 				self.name_to_fd[name] = fd
 				self.fd_to_wq[fd] = wq
 		except:
-			raise
-		finally:
 			close_connection(conn)
+			raise
 
 	def unregister(self, name):
+		"""
+		Initiates the shutdown process for the message queue associated with the worker with
+		name ``name``.
+		"""
+
 		with self.lock:
 			if name not in self.name_to_fd:
 				return
 
 			wq = self._name_to_wq(name)
 			wq.pending_shutdown = True
-			self.epoll.modify(wq.queue.conn, self.conn_event_bitmask)
+			self.epoll.modify(wq.conn, self.conn_event_bitmask)
 
 	def notify(self, name, msg):
 		with self.lock:
@@ -129,7 +142,7 @@ class WorkerNotifier:
 
 			wq = self._name_to_wq(name)
 			wq.append(msg)
-			self.epoll.modify(wq.queue.conn, self.conn_event_bitmask)
+			self.epoll.modify(wq.conn, self.conn_event_bitmask)
 
 	def _shutdown_queue(self, wq):
 		close_connection(wq.conn)
@@ -149,6 +162,8 @@ class WorkerNotifier:
 				# TODO cancel all tasks claimed by this worker
 
 			if rem == 0 and not wq.pending_shutdown:
+				return
+			elif rem == 0 and wq.pending_shutdown:
 				self._shutdown_queue(wq)
 			elif rem != 0:
 				self.epoll.modify(fd, self.conn_event_bitmask)
@@ -163,7 +178,7 @@ class WorkerNotifier:
 		for wq in self.fd_to_wq.values():
 			close_connection(wq.conn)
 
-		shutdown_server()
+		request.environ.get('werkzeug.server.shutdown')()
 
 	def _check_signal(self, event):
 		if event & EPOLLIN:
@@ -190,4 +205,4 @@ class WorkerNotifier:
 
 			with self.lock:
 				for fd, event in events:
-					self.process_event(fd, event)
+					self._process_event(fd, event)
