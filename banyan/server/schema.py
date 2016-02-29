@@ -417,7 +417,7 @@ registered_workers = {
 			}
 		},
 
-		'roles': {
+		'permissions': {
 			'type': 'list',
 			'default': ['claim', 'report'],
 			'allowed': ['claim', 'report'],

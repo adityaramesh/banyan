@@ -151,11 +151,11 @@ class ValidatorBase(eve.io.mongo.Validator):
 		if ex_data['token'] != orig_ex_data['token']:
 			abort(403, description="Provided execution data token does not match.")
 
-	def ensure_worker_has_role(self, role):
+	def ensure_worker_has_permission(self, perm):
 		assert g.user_info is not None
 
-		if role not in g.user_info['roles']:
-			abort(403, description="Worker lacks '{}' permission.".format(role))
+		if perm not in g.user_info['permissions']:
+			abort(403, description="Worker lacks '{}' permission.".format(perm))
 
 	def validate_state_change(self, final_state, update, required_fields):
 		def fail():
@@ -204,19 +204,19 @@ class ValidatorBase(eve.io.mongo.Validator):
 				return False
 
 			if sf == 'running':
-				self.ensure_worker_has_role('claim')
+				self.ensure_worker_has_permission('claim')
 
 				if not self.validate_state_change(sf, document,
 						required_fields={'worker'}):
 					return False
 			elif sf == 'terminated' or (sf == 'cancelled' and role == 'worker'):
-				self.ensure_worker_has_role('report')
+				self.ensure_worker_has_permission('report')
 
 				if not self.validate_state_change(sf, document,
 						required_fields={'exit_status', 'time_terminated'}):
 					return False
 		elif ex_data_update:
-			self.ensure_worker_has_role('report')
+			self.ensure_worker_has_permission('report')
 
 			keys         = set(document['update_execution_data'].keys())
 			special_keys = {'worker', 'exit_status', 'time_terminated'}

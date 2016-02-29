@@ -42,8 +42,8 @@ class TokenAuth(TokenAuthBase):
 		"""
 		if resource == 'tasks' and res['role'] == 'worker':
 			user_info = db.registered_users.find_one({config.ID_FIELD: res['_id']},
-				projection={'roles': True})
-			if not user_info or len(user_info['roles']) == 0:
+				projection={'permissions': True})
+			if not user_info or len(user_info['permissions']) == 0:
 				return False
 
 			g.user_info = info
