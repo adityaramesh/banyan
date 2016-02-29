@@ -362,9 +362,11 @@ registered_workers = {
 			'createonly': True,
 
 			'schema': {
+				# TODO regex validation for IPv4 and IPv6. Not too important,
+				# because even if the regex is valid, we still have to attempt to
+				# connect to the address.
 				'ip': {
 					'type': 'string',
-					'empty': False,
 					'required': True
 				},
 
