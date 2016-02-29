@@ -341,10 +341,48 @@ execution_info = {
 	'schema': execution_data
 }
 
+"""
+This resource is not intended for access by users; it is a read-only version of the database managed
+by ``access.py``. This database is exposed as a resource solely so that we can validate the
+``worker_id`` field of the ``registered_users`` resource.
+"""
+users = {
+	'schema': {
+		'name': {
+			'type': 'string',
+			'empty': False,
+			'unique': True,
+			'required': True,
+			'readonly': True
+		},
+
+		'role': {
+			'type': 'list',
+			'allowed': ['provider', 'worker'],
+			'required': True,
+			'readonly': True
+		},
+
+		'response_token': {
+			'type': 'string',
+			'dependencies': {'role': 'worker'},
+			'required': True,
+			'readonly': True
+		},
+
+		'request_token': {
+			'type': 'string',
+			'required': True,
+			'readonly': True
+		}
+	}
+}
+
 registered_workers = {
 	'authentication': TokenAuth,
-	'resource_methods': ['GET', 'POST', 'DELETE'],
-	'item_methods': ['GET'],
+	'resource_methods': ['GET', 'POST'],
+	'item_methods': ['GET', 'DELETE'],
+	'allowed_roles': ['provider'],
 	'allowed_read_roles': ['provider'],
 	'allowed_write_roles': ['provider'],
 
@@ -383,7 +421,6 @@ registered_workers = {
 			'type': 'list',
 			'default': ['claim', 'report'],
 			'allowed': ['claim', 'report'],
-			'required': True,
 			'readonly': True
 		}
 	}

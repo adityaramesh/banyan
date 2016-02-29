@@ -1129,6 +1129,42 @@ class TestFilterQuery(unittest.TestCase):
 
 		resp = get(self.entry, self.cred.provider_key, 'tasks', where=query)
 		self.assertEqual(len(resp.json()['_items']), 1)
+
+class TestWorkerRegistration(unittest.TestCase):
+	"""
+	Tests that creation of tasks and updates to inactive tasks work as expected.
+	"""
+
+	def __init__(self, entry, db, cred, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.entry = entry
+		self.db = db
+		self.cred = cred
+
+	def test_registration(self):
+		provider_id = self.db.users.find_one({'name': self.cred.provider_name}, {'_id': True})
+		worker_id = self.db.users.find_one({'name': self.cred.worker_name}, {'_id': True})
+
+		entry_1 = {
+			'worker_id': str(provider_id['_id']),
+			'address': {'ip': 'blah', 'port': 200}
+		}
+
+		entry_2 = {
+			'worker_id': str(worker_id['_id']),
+			'address': {'ip': 'blah', 'port': 200}
+		}
+
+		resp = post(entry_1, self.entry, self.cred.provider_key, 'registered_workers')
+		self.assertEqual(resp.status_code, requests.codes.unprocessable_entity)
+
+		resp = post(entry_2, self.entry, self.cred.provider_key, 'registered_workers')
+		reg_worker_id = resp.json()['_id']
+		self.assertEqual(resp.status_code, requests.codes.created)
+
+		resp = delete(self.entry, self.cred.provider_key, 'registered_workers',
+			str(reg_worker_id))
+		self.assertEqual(resp.status_code, requests.codes.no_content)
 		
 if __name__ == '__main__':
 	entry = EntryPoint()
@@ -1142,4 +1178,5 @@ if __name__ == '__main__':
 		suite.addTest(make_suite(TestCancellation, entry=entry, cred=cred, db=db))
 		suite.addTest(make_suite(TestTermination, entry=entry, cred=cred, db=db))
 		suite.addTest(make_suite(TestFilterQuery, entry=entry, cred=cred, db=db))
+		suite.addTest(make_suite(TestWorkerRegistration, entry=entry, cred=cred, db=db))
 		unittest.TextTestRunner().run(suite)

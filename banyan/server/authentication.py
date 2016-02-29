@@ -23,6 +23,15 @@ class TokenAuth(TokenAuthBase):
 		g.token = token
 		g.user = res
 
+		"""
+		XXX For some reason, Eve never seems to add the user's role to ``allowed_roles``
+		when the method is DELETE. A superficial search over the Eve codebase didn't bring
+		up anything useful, so I'm resorting to a hack for now.
+		"""
+		if method == 'DELETE':
+			extra_roles = app.config['DOMAIN'][resource].get('allowed_write_roles')
+			allowed_roles = allowed_roles + extra_roles
+
 		if not res or res['role'] not in allowed_roles:
 			return False
 		return True

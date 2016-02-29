@@ -90,6 +90,14 @@ def patch(update, entry_point, key, resource, item):
 
 	return requests.patch(url, headers=headers, data=json.dumps(update))
 
+def delete(entry_point, key, resource, item):
+	url = make_url(entry_point, resource, item)
+	headers = {'Content-Type': 'application/json'}
+	if key:
+		headers['Authorization'] = 'Basic ' + key
+
+	return requests.delete(url, headers=headers)
+
 def make_suite(testcase_klass, *args, **kwargs):
 	"""
 	Adapted from Eli Bendersky's blog post here_.

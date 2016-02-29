@@ -8,7 +8,7 @@ Configuration settings for Eve.
 """
 
 import os
-from banyan.server.schema import tasks, execution_info, registered_workers
+from banyan.server.schema import tasks, users, execution_info, registered_workers
 from config.settings import mongo_port, max_task_set_size
 
 # XXX: remove after testing.
@@ -30,6 +30,7 @@ HATEOAS  = False
 
 DOMAIN = {
 	'tasks': tasks,
+	'users': users,
 	'execution_info': execution_info,
 	'registered_workers': registered_workers
 }

@@ -27,7 +27,7 @@ for parent_res, virtuals in virtual_resources.items():
 		if 'item' in schema['granularity']:
 			item_level_virtual_resources.add(virtual_res)
 
-def acquire_lock(request):
+def acquire_lock(request, lookup=None):
 	lock.acquire()
 	g.lock_owner = True
 
