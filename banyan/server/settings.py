@@ -30,5 +30,6 @@ HATEOAS  = False
 
 DOMAIN = {
 	'tasks': tasks,
-	'execution_info': execution_info
+	'execution_info': execution_info,
+	'registered_workers': registered_workers
 }
