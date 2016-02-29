@@ -151,6 +151,12 @@ class ValidatorBase(eve.io.mongo.Validator):
 		if ex_data['token'] != orig_ex_data['token']:
 			abort(403, description="Provided execution data token does not match.")
 
+	def ensure_worker_has_role(self, role):
+		assert g.user_info is not None
+
+		if role not in g.user_info['roles']:
+			abort(403, description="Worker lacks '{}' permission.".format(role))
+
 	def validate_state_change(self, final_state, update, required_fields):
 		def fail():
 			self._error('state', "State cannot be changed to '{}' without setting "
@@ -176,13 +182,16 @@ class ValidatorBase(eve.io.mongo.Validator):
 		assert g.user is not None
 
 		role           = g.user['role']
-		state_update   = 'state' in document
 		ex_data_update = 'update_execution_data' in document
 
-		if ex_data_update and (not state_update or document['state'] != 'running'):
+		"""
+		Ensure that if a worker is updating a task that is has already claimed, then the
+		execution data token that is has provided is correct.
+		"""
+		if ex_data_update and ('state' not in document or document['state'] != 'running'):
 			self.validate_execution_data_token(document, original_document)
 
-		if state_update:
+		if 'state' in document:
 			si = original_document['state']
 			sf = document['state']
 
@@ -195,17 +204,23 @@ class ValidatorBase(eve.io.mongo.Validator):
 				return False
 
 			if sf == 'running':
+				self.ensure_worker_has_role('claim')
+
 				if not self.validate_state_change(sf, document,
 						required_fields={'worker'}):
 					return False
 			elif sf == 'terminated' or (sf == 'cancelled' and role == 'worker'):
+				self.ensure_worker_has_role('report')
+
 				if not self.validate_state_change(sf, document,
 						required_fields={'exit_status', 'time_terminated'}):
 					return False
 		elif ex_data_update:
-			keys = set(document['update_execution_data'].keys())
+			self.ensure_worker_has_role('report')
+
+			keys         = set(document['update_execution_data'].keys())
 			special_keys = {'worker', 'exit_status', 'time_terminated'}
-			common_keys = keys & special_keys
+			common_keys  = keys & special_keys
 
 			if len(common_keys) != 0:
 				self._error('update_execution_data', "The fields {} cannot be "

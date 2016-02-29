@@ -10,6 +10,7 @@ information.
 
 from flask import g, current_app as app
 from eve.auth import TokenAuth as TokenAuthBase
+from eve.utils import config
 
 class TokenAuth(TokenAuthBase):
 	def check_auth(self, token, allowed_roles, resource, method):
@@ -34,6 +35,19 @@ class TokenAuth(TokenAuthBase):
 
 		if not res or res['role'] not in allowed_roles:
 			return False
+
+		"""
+		We only perform partial validation of the worker credentials here. Additional
+		validation is performed in the validator.
+		"""
+		if resource == 'tasks' and res['role'] == 'worker':
+			user_info = db.registered_users.find_one({config.ID_FIELD: res['_id']},
+				projection={'roles': True})
+			if not user_info or len(user_info['roles']) == 0:
+				return False
+
+			g.user_info = info
+
 		return True
 
 class RestrictCreationToProviders(TokenAuthBase):
