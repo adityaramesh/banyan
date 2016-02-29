@@ -7,7 +7,7 @@ banyan.server.validation
 Defines custom validators for resource schema.
 """
 
-from flask import Response, abort, g, current_app as app
+from flask import abort, g, current_app as app
 from eve.methods.common import serialize
 import eve.io.mongo
 
@@ -15,6 +15,13 @@ from banyan.server.state import legal_provider_transitions, legal_worker_transit
 from banyan.server.constants import *
 from banyan.server.mongo_common import find_by_id
 
+"""
+One thing I dislike about Eve is that the configuration accepts a single global validator. This has
+the following disadvantages:
+1. The single custom validator may become complex and hard to maintain.
+2. We cannot easily "overload" custom validation rules by giving them different meanings when used
+   for different resources.
+"""
 class ValidatorBase(eve.io.mongo.Validator):
 	"""
 	Subclass of ``eve.io.mongo.Validator`` with support for the custom validation rules used by
@@ -60,12 +67,16 @@ class ValidatorBase(eve.io.mongo.Validator):
 		parent field's value, and ``update`` may be `True`.
 		"""
 
-		# We don't have any special constraints to enforce for subfields.
+		"""
+		As described above, ``context`` is non-null iff we are validating a subfield. Since
+		we don't have any special constraints to enforce for subfields, we just perform the
+		default validation.
+		"""
 		if context:
 			return super().validate(document, schema, update, context)
 
-		# See https://github.com/nicolaiarocci/eve/issues/796 for more
-		# information about this.
+		# See https://github.com/nicolaiarocci/eve/issues/796 for more information about
+		# this.
 		assert not update, "Expected 'validate_update' to be called for updates " \
 			"instead of 'validate' with 'update=True'."
 
@@ -74,29 +85,14 @@ class ValidatorBase(eve.io.mongo.Validator):
 				"'available' states.")
 			return False
 
-		# We call the parent's `validate` function now, so that we can
-		# ensure that all ObjectIDs for continuations are valid.
+		# We call the parent's `validate` function now, so that we can ensure that all
+		# ObjectIDs for continuations are valid.
 		if not super().validate(document, schema, update, context):
 			return False
 
-		return self.validate_continuations(document)
-
-	def validate_continuations(self, document):
-		if 'continuations' in document:
-			children = [self.db['tasks'].find_one({'_id': _id}) for _id in
-				document['continuations']]
-
-			# It's not practical to check for cyclic dependencies,
-			# but we do perform a basic sanity check.
-			if '_id' in document:
-				if document['_id'] in children:
-					self._error('continuations', "Task cannot have itself as a "
-						"continuation.")
-					return False
-
-			for child in children:
-				if not self.validate_continuation(child):
-					return False
+		for func in [self.validate_continuations, self.validate_worker_id]:
+			if not func(document):
+				return False
 		return True
 
 	def validate_continuation(self, child):
@@ -109,10 +105,43 @@ class ValidatorBase(eve.io.mongo.Validator):
 
 		return True
 
+	def validate_continuations(self, document):
+		if 'continuations' not in document:
+			return True
+
+		children = [self.db['tasks'].find_one({'_id': _id}) for _id in
+			document['continuations']]
+
+		# It's not practical to check for cyclic dependencies, but we do perform a basic
+		# sanity check.
+		if '_id' in document:
+			if document['_id'] in children:
+				self._error('continuations', "Task cannot have itself as a "
+					"continuation.")
+				return False
+
+		for child in children:
+			if not self.validate_continuation(child):
+				return False
+		return True
+
+	def validate_worker_id(self, documnet):
+		if 'worker_id' not in document:
+			return True
+
+		worker = find_by_id('users', document['worker_id'], self.db, {'role': True})
+
+		if worker['role'] != 'worker':
+			self._error('worker_id', "User with given id is a {}, not a {}.".format(
+				worker['role'], 'worker'))
+			return False
+
+		return True
+
 	def validate_execution_data_token(self, document, original_document):
 		ex_data = document['update_execution_data']
 
-		if not 'token' in ex_data:
+		if 'token' not in ex_data:
 			abort(401, description="Workers must provide the execution data token in "
 				"order to update the task status.")
 
