@@ -14,7 +14,7 @@ from flask import g, current_app as app
 from eve.utils import config
 
 from banyan.common import make_token
-from banyan.server.lock import lock
+from banyan.server.locks import task_lock, registered_workers_lock
 from banyan.server.state import legal_provider_transitions
 from banyan.server.schema import virtual_resources
 from banyan.server.mongo_common import find_by_id, update_by_id
@@ -27,11 +27,22 @@ for parent_res, virtuals in virtual_resources.items():
 		if 'item' in schema['granularity']:
 			item_level_virtual_resources.add(virtual_res)
 
-def acquire_lock(request, lookup=None):
-	lock.acquire()
-	g.lock_owner = True
+def acquire_lock(lock):
+	def impl(request, lookup=None):
+		lock.acquire()
+		g.lock_owner = True
 
-def acquire_lock_if_necessary(request, lookup):
+	return impl
+
+def release_lock_if_necessary(lock):
+	def impl(request, payload):
+		if hasattr(g, 'lock_owner') and g.lock_owner:
+			assert lock.locked()
+			lock.release()
+
+	return impl
+
+def acquire_task_lock_if_necessary(request, lookup):
 	if not request.json:
 		return
 
@@ -39,16 +50,11 @@ def acquire_lock_if_necessary(request, lookup):
 
 	for field in synchronized_fields:
 		if field in request.json:
-			lock.acquire()
+			task_lock.acquire()
 			g.lock_owner = True
 			return
 
 	g.lock_owner = False
-
-def release_lock_if_necessary(request, payload):
-	if hasattr(g, 'lock_owner') and g.lock_owner:
-		assert lock.locked()
-		lock.release()
 
 def modify_state_changes(request, lookup):
 	"""
@@ -186,7 +192,6 @@ def process_continuations(updates, original):
 			"""
 			for x in cont_list:
 				continuations.release(x, db)
-			
 
 def update_execution_data(updates, original):
 	"""
@@ -268,23 +273,23 @@ def append_execution_data_token(request, payload):
 	payload.set_data(json.dumps(parsed_payload))
 
 def register(app):
-	app.on_pre_POST_tasks  += acquire_lock
-	app.on_post_POST_tasks += release_lock_if_necessary
+	app.on_pre_POST_tasks  += acquire_lock(task_lock)
+	app.on_post_POST_tasks += release_lock_if_necessary(task_lock)
 
 	"""
 	We also need to synchronize registration/unregistration of workers, since this could
 	potentially trigger races with authentication or validation when checking worker
 	permissions.
 	"""
-	app.on_pre_POST_registered_workers    += acquire_lock
-	app.on_post_POST_registered_workers   += release_lock_if_necessary
-	app.on_pre_DELETE_registered_workers  += acquire_lock
-	app.on_post_DELETE_registered_workers += release_lock_if_necessary
+	app.on_pre_POST_registered_workers    += acquire_lock(registered_workers_lock)
+	app.on_post_POST_registered_workers   += release_lock_if_necessary(registered_workers_lock)
+	app.on_pre_DELETE_registered_workers  += acquire_lock(registered_workers_lock)
+	app.on_post_DELETE_registered_workers += release_lock_if_necessary(registered_workers_lock)
 
-	app.on_pre_PATCH_tasks  += acquire_lock_if_necessary
+	app.on_pre_PATCH_tasks  += acquire_task_lock_if_necessary
 	app.on_pre_PATCH_tasks  += modify_state_changes
 	app.on_post_PATCH_tasks += append_execution_data_token
-	app.on_post_PATCH_tasks += release_lock_if_necessary
+	app.on_post_PATCH_tasks += release_lock_if_necessary(task_lock)
 
 	app.on_insert_tasks   += terminate_empty_tasks
 	app.on_inserted_tasks += acquire_continuations
@@ -306,7 +311,8 @@ def register(app):
 
 	@app.errorhandler(Exception)
 	def handle_error(error):
-		release_lock_if_necessary(None, None)
+		release_lock_if_necessary(task_lock)(None, None)
+		release_lock_if_necessary(registered_workers_lock)(None, None)
 
 		if isinstance(error, HTTPException):
 			return error

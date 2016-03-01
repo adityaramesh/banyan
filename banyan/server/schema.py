@@ -12,6 +12,7 @@ from eve.utils import config
 import banyan.server.continuations as continuations
 import banyan.server.execution_data as execution_data_
 
+from banyan.server.locks import task_lock
 from banyan.server.constants import *
 from banyan.server.authentication import TokenAuth, RestrictCreationToProviders
 
@@ -125,7 +126,7 @@ execution_data = {
 	'time_started': {'type': 'datetime', 'createonly': True},
 	'time_terminated': {'type': 'datetime', 'createonly': True},
 
-	# Resource usage statistics. 
+	# Resource usage statistics.
 
 	'last_update': {'type': 'datetime'},
 
@@ -473,7 +474,7 @@ virtual_resources = {
 			'granularity': ['resource', 'item'],
 			'validator': continuations.AddContinuationValidator,
 			'on_update': continuations.make_additions,
-			'synchronize': True,
+			'lock': task_lock,
 
 			'value_schema': {
 				'type': 'list',
@@ -493,7 +494,7 @@ virtual_resources = {
 			'granularity': ['resource', 'item'],
 			'validator': continuations.RemoveContinuationValidator,
 			'on_update': continuations.make_removals,
-			'synchronize': True,
+			'lock': task_lock,
 
 			'value_schema': {
 				'type': 'list',
@@ -513,7 +514,7 @@ virtual_resources = {
 			'granularity': ['item'],
 			'validator': execution_data_.ExecutionDataValidator,
 			'on_update': execution_data_.make_update,
-			'synchronize': True,
+			'lock': task_lock,
 
 			'value_schema': {
 				'type': 'dict',

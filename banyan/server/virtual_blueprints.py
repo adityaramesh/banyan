@@ -14,12 +14,11 @@ from eve.utils import config, debug_error_message
 from eve.validation import ValidationError
 from eve.methods.common import payload
 
-from banyan.server.lock import lock
 from banyan.server.schema import virtual_resources
 from banyan.server.validation import BulkUpdateValidator
 
 def make_resource_level_handler(parent_resource, virtual_resource, schema, validator_class,
-	on_update, synchronize):
+	on_update, lock):
 
 	"""
 	Defines and returns a request handler for a virtual resource at resource-level granularity.
@@ -39,7 +38,7 @@ def make_resource_level_handler(parent_resource, virtual_resource, schema, valid
 		issues = {}
 
 		try:
-			if synchronize:
+			if lock:
 				lock.acquire()
 
 			"""
@@ -105,7 +104,7 @@ def make_resource_level_handler(parent_resource, virtual_resource, schema, valid
 			abort(400, description=debug_error_message("An exception occurred: {}".
 				format(e)))
 		finally:
-			if synchronize:
+			if lock:
 				lock.release()
 
 		response = {}
@@ -124,16 +123,14 @@ def make_resource_level_handler(parent_resource, virtual_resource, schema, valid
 
 	return handler
 
-def make_item_level_handler(parent_resource, virtual_resource, schema, validator, on_update,
-	synchronize):
-
+def make_item_level_handler(parent_resource, virtual_resource, schema, validator, on_update, lock):
 	"""
 	Same as ``make_resource_level_handler``, but for virtual resources that work at item-level
 	granularity.
 	"""
 
 	handler = make_resource_level_handler(parent_resource, virtual_resource, schema, validator,
-		on_update, synchronize)
+		on_update, lock)
 
 	def scaffold(target_id, values, skip_validation=False):
 		"""
@@ -157,7 +154,7 @@ def route(p_res, v_res, schema):
 	update_schema = schema['schema']
 	on_update     = schema['on_update']
 	validator     = schema.get('validator') or BulkUpdateValidator
-	synchronize   = schema.get('synchronize') or False
+	lock          = schema.get('lock') or False
 
 	schema['handlers'] = {}
 	router = Blueprint(p_res + '/' + v_res, __name__)
@@ -165,7 +162,7 @@ def route(p_res, v_res, schema):
 
 	if 'resource' in schema['granularity']:
 		h1 = make_resource_level_handler(p_res, v_res, update_schema, validator, on_update,
-			synchronize)
+			lock)
 		schema['handlers']['resource_level'] = h1
 
 		"""
@@ -179,7 +176,7 @@ def route(p_res, v_res, schema):
 
 	if 'item' in schema['granularity']:
 		h2 = make_item_level_handler(p_res, v_res, update_schema, validator, on_update,
-			synchronize)
+			lock)
 		schema['handlers']['item_level'] = h2
 
 		"""
