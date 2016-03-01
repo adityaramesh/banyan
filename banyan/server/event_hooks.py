@@ -34,10 +34,12 @@ def acquire_lock(lock):
 
 	return impl
 
-def release_lock_if_necessary(lock):
+def release_lock(lock):
 	def impl(request, payload):
-		if hasattr(g, 'lock_owner') and g.lock_owner:
-			assert lock.locked()
+		"""
+		If an error occurred in the validator, then the lock will not have been acquired.
+		"""
+		if lock.locked():
 			lock.release()
 
 	return impl
@@ -274,7 +276,7 @@ def append_execution_data_token(request, payload):
 
 def register(app):
 	app.on_pre_POST_tasks  += acquire_lock(task_lock)
-	app.on_post_POST_tasks += release_lock_if_necessary(task_lock)
+	app.on_post_POST_tasks += release_lock(task_lock)
 
 	"""
 	We also need to synchronize registration/unregistration of workers, since this could
@@ -282,14 +284,14 @@ def register(app):
 	permissions.
 	"""
 	app.on_pre_POST_registered_workers    += acquire_lock(registered_workers_lock)
-	app.on_post_POST_registered_workers   += release_lock_if_necessary(registered_workers_lock)
+	app.on_post_POST_registered_workers   += release_lock(registered_workers_lock)
 	app.on_pre_DELETE_registered_workers  += acquire_lock(registered_workers_lock)
-	app.on_post_DELETE_registered_workers += release_lock_if_necessary(registered_workers_lock)
+	app.on_post_DELETE_registered_workers += release_lock(registered_workers_lock)
 
 	app.on_pre_PATCH_tasks  += acquire_task_lock_if_necessary
 	app.on_pre_PATCH_tasks  += modify_state_changes
 	app.on_post_PATCH_tasks += append_execution_data_token
-	app.on_post_PATCH_tasks += release_lock_if_necessary(task_lock)
+	app.on_post_PATCH_tasks += release_lock(task_lock)
 
 	app.on_insert_tasks   += terminate_empty_tasks
 	app.on_inserted_tasks += acquire_continuations
@@ -311,8 +313,8 @@ def register(app):
 
 	@app.errorhandler(Exception)
 	def handle_error(error):
-		release_lock_if_necessary(task_lock)(None, None)
-		release_lock_if_necessary(registered_workers_lock)(None, None)
+		release_lock(task_lock)(None, None)
+		release_lock(registered_workers_lock)(None, None)
 
 		if isinstance(error, HTTPException):
 			return error
