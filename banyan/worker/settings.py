@@ -16,9 +16,9 @@ resource usage.
 """
 
 task_cache_size = max_task_set_size
+
 # How often to refresh the local task cache.
 task_cache_update_period_ms = 10 * 1000
-# How often to send updates to the server, in milliseconds.
-task_update_period = 60 * 1000
+
 # How often the statuses of running tasks should be polled.
-task_poll_period = 100
+task_poll_period = 1000
