@@ -81,7 +81,7 @@ class WorkerNotifier:
 
 		self.epoll = select.epoll(flags=EPOLL_CLOEXEC)
 		self.epoll.register(self.sig_fd, EPOLLIN)
-		Thread(target=self.poll_events).start()
+		Thread(target=self._poll_events).start()
 
 	def log(msg):
 		print(msg, file=sys.stderr, flush=True)
