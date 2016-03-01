@@ -40,8 +40,8 @@ def close_connection(conn, how=socket.SHUT_RDWR):
 	conn.close()
 
 class WorkerQueue:
-	def __init__(self, name, conn):
-		self.name             = name
+	def __init__(self, _id, conn):
+		self._id              = _id
 		self.conn             = conn
 		self.msg_queue        = []
 		self.pending_shutdown = False
@@ -75,9 +75,9 @@ class WorkerNotifier:
 		signalfd.sigprocmask(SIG_UNBLOCK, shutdown_signals)
 		self.sig_fd = signalfd.signalfd(-1, shutdown_signals, SFD_CLOEXEC | SFD_NONBLOCK)
 
-		self.lock       = Lock()
-		self.fd_to_wq   = {}
-		self.name_to_fd = {}
+		self.lock     = Lock()
+		self.fd_to_wq = {}
+		self.id_to_fd = {}
 
 		self.epoll = select.epoll(flags=EPOLL_CLOEXEC)
 		self.epoll.register(self.sig_fd, EPOLLIN)
@@ -86,19 +86,19 @@ class WorkerNotifier:
 	def log(msg):
 		print(msg, file=sys.stderr, flush=True)
 
-	def _name_to_wq(self, name):
-		return self.fd_to_wq[self.name_to_fd[name]]
+	def _id_to_wq(self, _id):
+		return self.fd_to_wq[self.id_to_fd[_id]]
 
-	def register(self, name, addr):
+	def register(self, _id, addr):
 		"""
 		Registers a worker so that we can send notifications to it in the future. If a
-		worker with the given name is already registered with this queue, then a
+		worker with the given id is already registered with this queue, then a
 		``RuntimeError`` is raised.
 
 		Args:
-			name: The name of the worker.
+			_id: The id of the worker.
 			addr: A tuple describing the IP address and port identifying the worker with
-			name ``name``.
+			id ``_id``.
 		"""
 
 		try:
@@ -107,47 +107,47 @@ class WorkerNotifier:
 			conn.setblocking(False)
 
 			with self.lock:
-				if name in self.name_to_fd:
+				if _id in self.id_to_fd:
 					raise RuntimeError("Worker '{}' is already registered.".
-						format(name))
+						format(_id))
 
 				self.epoll.register(conn, self.conn_event_bitmask)
 				fd = conn.fileno()
-				wq = WorkerQueue(name, conn)
+				wq = WorkerQueue(_id, conn)
 
-				self.name_to_fd[name] = fd
+				self.id_to_fd[_id] = fd
 				self.fd_to_wq[fd] = wq
 		except:
 			close_connection(conn)
 			raise
 
-	def unregister(self, name):
+	def unregister(self, _id):
 		"""
 		Initiates the shutdown process for the message queue associated with the worker with
-		name ``name``.
+		id ``_id``.
 		"""
 
 		with self.lock:
-			if name not in self.name_to_fd:
+			if _id not in self.id_to_fd:
 				return
 
-			wq = self._name_to_wq(name)
+			wq = self._id_to_wq(id)
 			wq.pending_shutdown = True
 			self.epoll.modify(wq.conn, self.conn_event_bitmask)
 
-	def notify(self, name, msg):
+	def notify(self, _id, msg):
 		with self.lock:
-			if name not in self.name_to_fd or self._name_to_wq(name).pending_shutdown:
+			if _id not in self.id_to_fd or self._id_to_wq(_id).pending_shutdown:
 				return False
 
-			wq = self._name_to_wq(name)
+			wq = self._id_to_wq(_id)
 			wq.append(msg)
 			self.epoll.modify(wq.conn, self.conn_event_bitmask)
 
 	def _shutdown_queue(self, wq):
 		close_connection(wq.conn)
 		self.fd_to_wq.pop(wq.conn.fileno())
-		self.name_to_fd.pop(wq.name)
+		self.id_to_fd.pop(wq._id)
 
 	def _check_queue(self, fd, event):
 		if event & (EPOLLOUT | EPOLLERR | EPOLLRDHUP | EPOLLHUP):
@@ -157,7 +157,7 @@ class WorkerNotifier:
 			try:
 				rem = wq.drain()
 			except OSError as e:
-				self.log("Error notifying worker '{}': {}".format(wq.name, repr(e)))
+				self.log("Error notifying worker '{}': {}".format(wq._id, repr(e)))
 				self._shutdown_queue(wq)
 				# TODO cancel all tasks claimed by this worker
 
