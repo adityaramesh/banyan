@@ -109,10 +109,10 @@ execution_data = {
 		'readonly': True
 	},
 
-	'worker': {
-		'type': 'string',
-		'maxlength': max_name_string_length,
-		'empty': False,
+	'worker_id': {
+		'type': 'objectid',
+		'data_relation': {'resource': 'users', 'field': config.ID_FIELD},
+		'required': True,
 		'createonly': True
 	},
 
@@ -255,7 +255,7 @@ tasks = {
 			'creatable_iff_inactive': True,
 			'schema': {
 				'type': 'objectid',
-				'data_relation': {'resource': 'tasks'}
+				'data_relation': {'resource': 'tasks', 'field': config.ID_FIELD}
 			}
 		},
 
@@ -327,7 +327,7 @@ tasks = {
 		# `update_execution_data` virtual resource.
 		'execution_data_id': {
 			'type': 'objectid',
-			'data_relation': {'resource': 'execution_info'},
+			'data_relation': {'resource': 'execution_info', 'field': config.ID_FIELD},
 			'readonly': True
 		}
 	}
@@ -390,7 +390,7 @@ registered_workers = {
 	'schema': {
 		'worker_id': {
 			'type': 'objectid',
-			'data_relation': {'resource': 'users'},
+			'data_relation': {'resource': 'users', 'field': config.ID_FIELD},
 			'required': True,
 			'createonly': True
 		},

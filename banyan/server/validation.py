@@ -207,7 +207,7 @@ class ValidatorBase(eve.io.mongo.Validator):
 				self.ensure_worker_has_permission('claim')
 
 				if not self.validate_state_change(sf, document,
-						required_fields={'worker'}):
+						required_fields={'worker_id'}):
 					return False
 			elif sf == 'terminated' or (sf == 'cancelled' and role == 'worker'):
 				self.ensure_worker_has_permission('report')
@@ -219,7 +219,7 @@ class ValidatorBase(eve.io.mongo.Validator):
 			self.ensure_worker_has_permission('report')
 
 			keys         = set(document['update_execution_data'].keys())
-			special_keys = {'worker', 'exit_status', 'time_terminated'}
+			special_keys = {'worker_id', 'exit_status', 'time_terminated'}
 			common_keys  = keys & special_keys
 
 			if len(common_keys) != 0:

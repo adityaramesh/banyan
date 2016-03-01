@@ -41,7 +41,7 @@ def add_provider(name, request_token, db):
 	if db.users.find_one({'name': name}):
 		raise RuntimeError("User with name '{}' already exists.".format(name))
 
-	db.users.insert({
+	return db.users.insert({
 		'name': name,
 		'request_token': request_token,
 		'role': 'provider'
@@ -59,7 +59,7 @@ def add_worker(name, request_token, response_token, db):
 	if db.users.find_one({'name': name}):
 		raise RuntimeError("User with name '{}' already exists.".format(name))
 
-	db.users.insert({
+	return db.users.insert({
 		'name': name,
 		'response_token': response_token,
 		'request_token': request_token,

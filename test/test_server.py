@@ -30,8 +30,10 @@ class Credentials():
 		self.worker_name = 'test_worker'
 		self.worker_token = access.make_token()
 
-		access.add_provider(self.provider_name, self.provider_token, self.db)
-		access.add_worker(self.worker_name, self.worker_token, make_token(), self.db)
+		self.provider_id = str(access.add_provider(self.provider_name, self.provider_token,
+			self.db))
+		self.worker_id = str(access.add_worker(self.worker_name, self.worker_token,
+			make_token(), self.db))
 
 		self.provider_key = authorization_key(self.provider_token)
 		self.worker_key = authorization_key(self.worker_token)
@@ -561,7 +563,7 @@ class TestExecutionInfo(unittest.TestCase):
 			update = {
 				'state': 'running',
 				'update_execution_data': {
-					'worker': self.cred.worker_name
+					'worker_id': self.cred.worker_id
 				}
 			}
 			return patch(update, self.entry, self.cred.worker_key, 'tasks', task_id)
@@ -588,7 +590,7 @@ class TestExecutionInfo(unittest.TestCase):
 		bad_updates = [
 			{'task': task_ids[0], 'token': token},
 			{'attempt_count': 2, 'token': token},
-			{'worker': '', 'token': token},
+			{'worker_id': '', 'token': token},
 			{'exit_status': 'success', 'token': token},
 			{'time_terminated': 'Tue, 02 Apr 2013 10:29:13 GMT', 'token': token}
 		]
@@ -821,7 +823,7 @@ class TestTermination(unittest.TestCase):
 
 		claim_update = {
 			'state': 'running',
-			'update_execution_data': {'worker': self.cred.worker_name}
+			'update_execution_data': {'worker_id': self.cred.worker_id}
 		}
 
 		term_update = {
@@ -885,7 +887,7 @@ class TestTermination(unittest.TestCase):
 
 		claim_update = {
 			'state': 'running',
-			'update_execution_data': {'worker': self.cred.worker_name}
+			'update_execution_data': {'worker_id': self.cred.worker_id}
 		}
 
 		term_update = {
@@ -945,7 +947,7 @@ class TestTermination(unittest.TestCase):
 
 		claim_update = {
 			'state': 'running',
-			'update_execution_data': {'worker': self.cred.worker_name}
+			'update_execution_data': {'worker_id': self.cred.worker_id}
 		}
 
 		term_update = {
