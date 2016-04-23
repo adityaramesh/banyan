@@ -10,6 +10,7 @@ a given worker is no longer available, then we proceed to unregister it.
 
 import time
 
+from datetime import datetime
 from timeit import default_timer as timer
 from threading import Thread
 from flask import current_app as app
@@ -32,13 +33,17 @@ class WorkerAvailabilityChecker:
 		msg = format_message(resource_usage_request, worker['request_token'])
 		self.notifier.notify(_id, msg)
 
-	def _received_update(self, _id):
-		pass
+	def _received_update(self, _id, cur_time):
+		return db.execution_info.find_one({
+			'worker_id': _id,
+			'last_update': {'$gt': cur_time}
+		}) == None
 
 	def _poll_workers(self):
 		sleep_time = usage_update_poll_period
 
 		while True:
+			cur_time = datetime.now()
 			time.sleep(sleep_time)
 			start = timer()
 
@@ -58,7 +63,7 @@ class WorkerAvailabilityChecker:
 				# Check that we have received updates from workers that have already
 				# been registered.
 				for _id in self.current_workers & worker_ids:
-					if not self._received_update(_id):
+					if not self._received_update(_id, cur_time):
 						# TODO cancel all tasks claimed by the worker
 					else:
 						self._notify_worker(_id)
